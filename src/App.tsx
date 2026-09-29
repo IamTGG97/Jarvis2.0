@@ -3,8 +3,15 @@ import './App.css'
 
 function App() {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const microphoneStreamRef = useRef<MediaStream | null>(null)
   const [cameraStatus, setCameraStatus] = useState<'requesting' | 'active' | 'error'>('requesting')
   const [cameraMessage, setCameraMessage] = useState('Waiting for camera permission')
+  const [isVideoReady, setIsVideoReady] = useState(false)
+  const [isMicrophoneActive, setIsMicrophoneActive] = useState(false)
+  const [microphoneMessage, setMicrophoneMessage] = useState('Microphone is off')
+  const [capturedFrame, setCapturedFrame] = useState('')
+  const [capturedResolution, setCapturedResolution] = useState('')
 
   useEffect(() => {
     let isCurrent = true
@@ -44,9 +51,47 @@ function App() {
     return () => {
       isCurrent = false
       cameraStream?.getTracks().forEach((track) => track.stop())
+      microphoneStreamRef.current?.getTracks().forEach((track) => track.stop())
       if (videoRef.current) videoRef.current.srcObject = null
     }
   }, [])
+
+  async function toggleMicrophone() {
+    if (isMicrophoneActive) {
+      microphoneStreamRef.current?.getTracks().forEach((track) => track.stop())
+      microphoneStreamRef.current = null
+      setIsMicrophoneActive(false)
+      setMicrophoneMessage('Microphone is off')
+      return
+    }
+
+    const video = videoRef.current
+    const canvas = canvasRef.current
+    const context = canvas?.getContext('2d')
+    if (!video || !canvas || !context || !video.videoWidth || !video.videoHeight) {
+      setMicrophoneMessage('Camera is not ready to capture a frame yet')
+      return
+    }
+
+    const scale = Math.min(1, 1024 / Math.max(video.videoWidth, video.videoHeight))
+    canvas.width = Math.round(video.videoWidth * scale)
+    canvas.height = Math.round(video.videoHeight * scale)
+    context.drawImage(video, 0, 0, canvas.width, canvas.height)
+    setCapturedFrame(canvas.toDataURL('image/jpeg', 0.9))
+    setCapturedResolution(`${canvas.width} × ${canvas.height}`)
+
+    try {
+      microphoneStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+      setIsMicrophoneActive(true)
+      setMicrophoneMessage('Microphone active · frame captured')
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'NotAllowedError') {
+        setMicrophoneMessage('Microphone permission blocked. Allow access in your browser settings.')
+      } else {
+        setMicrophoneMessage('Could not start the microphone. Check your audio input and try again.')
+      }
+    }
+  }
 
   return (
     <main className="app-shell">
@@ -66,7 +111,14 @@ function App() {
 
         <section className="camera-panel" aria-label="Live camera preview">
           <div className="camera-view">
-            <video ref={videoRef} autoPlay muted playsInline aria-label="Live camera preview" />
+            <video
+              ref={videoRef}
+              autoPlay
+              muted
+              playsInline
+              onLoadedMetadata={() => setIsVideoReady(true)}
+              aria-label="Live camera preview"
+            />
             {cameraStatus !== 'active' && (
               <div className="camera-placeholder" role="status">
                 <span className="camera-symbol">◉</span>
@@ -88,8 +140,33 @@ function App() {
           </div>
         </section>
 
+        <section className="capture-controls" aria-label="Capture controls">
+          <div className="microphone-control">
+            <button
+              className={`microphone-button${isMicrophoneActive ? ' is-listening' : ''}`}
+              type="button"
+              onClick={() => void toggleMicrophone()}
+              disabled={cameraStatus !== 'active' || !isVideoReady}
+              aria-pressed={isMicrophoneActive}
+            >
+              <span className="microphone-button-icon" aria-hidden="true">{isMicrophoneActive ? '■' : '⌁'}</span>
+              {isMicrophoneActive ? 'Stop listening' : 'Start listening'}
+            </button>
+            <span className={`microphone-status${isMicrophoneActive ? ' is-listening' : ''}`} role="status">
+              <i />{microphoneMessage}
+            </span>
+          </div>
+          {capturedFrame && (
+            <div className="captured-frame">
+              <img src={capturedFrame} alt="Most recently captured camera frame" />
+              <span>CAPTURED FRAME <b>{capturedResolution}</b></span>
+            </div>
+          )}
+        </section>
+
         <footer className="privacy-note"><span>01</span> THE CAMERA FEED IS NOT UPLOADED OR SAVED.</footer>
       </section>
+      <canvas ref={canvasRef} className="capture-canvas" aria-hidden="true" />
     </main>
   )
 }

@@ -118,6 +118,57 @@
 .camera-caption-note { color: #9da79c; font-size: 9px; }
 .camera-caption-note b { padding: 0 5px; color: #ef8c70; }
 
+.capture-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  min-height: 88px;
+  padding: 18px 0;
+  border-bottom: 1px solid #d8dbd2;
+}
+
+.microphone-control { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+
+.microphone-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 3px;
+  background: #202621;
+  color: #f2f2eb;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.microphone-button:hover:not(:disabled) { background: #3c5649; }
+.microphone-button:focus-visible { outline: 3px solid #e45f42; outline-offset: 3px; }
+.microphone-button:disabled { cursor: not-allowed; opacity: .48; }
+.microphone-button.is-listening { background: #a74532; }
+.microphone-button-icon { min-width: 14px; font-size: 17px; line-height: 1; }
+
+.microphone-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #687167;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.microphone-status i { width: 7px; height: 7px; border-radius: 50%; background: #a5aaa1; }
+.microphone-status.is-listening i { background: #e45f42; box-shadow: 0 0 0 3px #e45f4230; }
+
+.captured-frame { display: flex; align-items: center; gap: 10px; }
+.captured-frame img { display: block; width: 64px; height: 48px; object-fit: cover; border: 1px solid #b6bdb2; }
+.captured-frame span { color: #70796f; font-family: 'Courier New', monospace; font-size: 9px; font-weight: 700; }
+.captured-frame b { display: block; margin-top: 4px; color: #202621; font-weight: 400; }
+.capture-canvas { display: none; }
+
 .privacy-note { margin: 22px 0 0; color: #7a8278; }
 .privacy-note span { margin-right: 9px; color: #e45f42; }
 
@@ -130,4 +181,6 @@
   .intro-copy { max-width: 300px; }
   .camera-view { aspect-ratio: 4 / 3; }
   .camera-caption-note { font-size: 8px; }
+  .capture-controls { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .microphone-control { align-items: flex-start; flex-direction: column; gap: 10px; }
 }
