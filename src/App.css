@@ -1,42 +1,133 @@
-#root {
-  max-width: 1280px;
+.app-shell {
+  min-height: 100vh;
+  background: #f2f2eb;
+  color: #202621;
+}
+
+.topbar {
+  height: 76px;
+  padding: 0 6.5vw;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #d8dbd2;
+}
+
+.wordmark {
+  color: #202621;
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-decoration: none;
+}
+
+.wordmark span { color: #e45f42; margin-left: 5px; font-size: 12px; }
+
+.topbar-note, .eyebrow, .camera-caption, .privacy-note {
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.topbar-note { color: #737b70; }
+.topbar-note span { color: #e45f42; padding: 0 5px; }
+
+.camera-workspace {
+  width: min(1080px, 87vw);
   margin: 0 auto;
-  padding: 2rem;
+  padding: 72px 0 38px;
+}
+
+.workspace-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 32px;
+  margin-bottom: 34px;
+}
+
+.eyebrow { margin: 0 0 16px; color: #70796f; }
+.eyebrow span { color: #e45f42; padding: 0 4px; }
+
+.workspace-heading h1 {
+  margin: 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(40px, 5vw, 64px);
+  font-weight: 400;
+  line-height: 1.02;
+}
+
+.workspace-heading h1 em { color: #42715f; font-weight: 400; }
+
+.intro-copy {
+  max-width: 230px;
+  margin: 0 0 7px;
+  color: #667066;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.camera-panel { background: #202621; padding: 10px; }
+
+.camera-view {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #303a34;
+}
+
+.camera-view video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.camera-placeholder {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 330px;
+  padding: 24px;
+  color: #f2f2eb;
   text-align: center;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
-}
+.camera-symbol { margin-bottom: 18px; color: #ef8c70; font-size: 30px; }
+.camera-placeholder strong { font-family: Georgia, 'Times New Roman', serif; font-size: 22px; font-weight: 400; }
+.camera-placeholder p { margin: 10px 0 0; color: #c1c9bf; font-size: 13px; line-height: 1.5; }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
+.view-corner { position: absolute; z-index: 1; width: 22px; height: 22px; border-color: #f2f2eb; opacity: .7; }
+.view-corner-tl { top: 17px; left: 17px; border-top: 1px solid; border-left: 1px solid; }
+.view-corner-tr { top: 17px; right: 17px; border-top: 1px solid; border-right: 1px solid; }
+.view-corner-bl { bottom: 17px; left: 17px; border-bottom: 1px solid; border-left: 1px solid; }
+.view-corner-br { bottom: 17px; right: 17px; border-bottom: 1px solid; border-right: 1px solid; }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
+.camera-caption { min-height: 42px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 8px; color: #d2d7ce; }
+.camera-indicator { display: inline-flex; align-items: center; gap: 8px; }
+.camera-indicator i { width: 7px; height: 7px; border-radius: 50%; background: #8c938b; }
+.camera-indicator i.is-active { background: #ef8c70; box-shadow: 0 0 0 3px #ef8c7030; }
+.camera-caption-note { color: #9da79c; font-size: 9px; }
+.camera-caption-note b { padding: 0 5px; color: #ef8c70; }
 
-.card {
-  padding: 2em;
-}
+.privacy-note { margin: 22px 0 0; color: #7a8278; }
+.privacy-note span { margin-right: 9px; color: #e45f42; }
 
-.read-the-docs {
-  color: #888;
+@media (max-width: 620px) {
+  .topbar { height: 64px; padding: 0 6vw; }
+  .topbar-note { max-width: 118px; text-align: right; line-height: 1.5; }
+  .camera-workspace { width: 88vw; padding-top: 48px; }
+  .workspace-heading { align-items: start; flex-direction: column; gap: 15px; margin-bottom: 23px; }
+  .workspace-heading h1 { font-size: 44px; }
+  .intro-copy { max-width: 300px; }
+  .camera-view { aspect-ratio: 4 / 3; }
+  .camera-caption-note { font-size: 8px; }
 }
