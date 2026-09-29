@@ -89,6 +89,29 @@
   box-shadow: 0 0 12px #ff765b99;
 }
 
+.voice-feedback {
+  position: absolute;
+  bottom: max(166px, calc(env(safe-area-inset-bottom) + 156px));
+  left: 50%;
+  width: max-content;
+  max-width: min(540px, 84vw);
+  max-height: 28vh;
+  margin: 0;
+  padding: 10px 15px;
+  overflow: auto;
+  transform: translateX(-50%);
+  border: 1px solid #ffffff42;
+  border-radius: 18px;
+  background: #151a16a6;
+  color: #f7f6f0;
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: center;
+  overflow-wrap: anywhere;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
 .microphone-button {
   position: absolute;
   bottom: max(82px, calc(env(safe-area-inset-bottom) + 72px));

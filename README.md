@@ -1,5 +1,29 @@
 # Jarvis2.0
 
+## Speech API (Phase 2)
+
+Install the Python dependencies into the project virtual environment:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+```
+
+Copy `.env.example` to `.env` and set `OPENAI_API_KEY` in `.env`. Keep `.env` private; Git ignores it.
+
+Start the API in one terminal:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn main:app --app-dir backend --reload --host 127.0.0.1 --port 8000
+```
+
+Start the frontend in another terminal:
+
+```powershell
+npm run dev
+```
+
+Vite proxies `/api` requests to the local FastAPI service. Without `OPENAI_API_KEY`, the health check works, but transcription returns a setup error.
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
