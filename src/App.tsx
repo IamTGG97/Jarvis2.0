@@ -95,76 +95,44 @@ function App() {
 
   return (
     <main className="app-shell">
-      <header className="topbar">
-        <a className="wordmark" href="#home">jarvis<span>2.0</span></a>
-        <p className="topbar-note">MULTIMODAL ASSISTANT <span>·</span> PROTOTYPE</p>
-      </header>
+      <section className="camera-scene" aria-label="Jarvis camera view">
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          playsInline
+          onLoadedMetadata={() => setIsVideoReady(true)}
+          aria-label="Live camera preview"
+        />
+        {cameraStatus !== 'active' && (
+          <div className="camera-placeholder" role="status">
+            <strong>{cameraStatus === 'requesting' ? 'Camera access' : 'Camera unavailable'}</strong>
+            <p>{cameraMessage}</p>
+          </div>
+        )}
 
-      <section className="camera-workspace" id="home" aria-labelledby="page-title">
-        <div className="workspace-heading">
-          <div>
-            <p className="eyebrow">PHASE 01 <span>/</span> CAMERA</p>
-            <h1 id="page-title">A window to<br /><em>what’s around you.</em></h1>
-          </div>
-          <p className="intro-copy">Your camera stays on this device. A frame is only captured when you ask.</p>
-        </div>
+        <span className="camera-led" aria-label={cameraStatus === 'active' ? 'Camera active' : 'Camera inactive'}>
+          <i className={cameraStatus === 'active' ? 'is-active' : ''} />
+        </span>
 
-        <section className="camera-panel" aria-label="Live camera preview">
-          <div className="camera-view">
-            <video
-              ref={videoRef}
-              autoPlay
-              muted
-              playsInline
-              onLoadedMetadata={() => setIsVideoReady(true)}
-              aria-label="Live camera preview"
-            />
-            {cameraStatus !== 'active' && (
-              <div className="camera-placeholder" role="status">
-                <span className="camera-symbol">◉</span>
-                <strong>{cameraStatus === 'requesting' ? 'Waiting for camera' : 'Camera unavailable'}</strong>
-                <p>{cameraMessage}</p>
-              </div>
-            )}
-            <div className="view-corner view-corner-tl" />
-            <div className="view-corner view-corner-tr" />
-            <div className="view-corner view-corner-bl" />
-            <div className="view-corner view-corner-br" />
-          </div>
-          <div className="camera-caption">
-            <span className="camera-indicator">
-              <i className={cameraStatus === 'active' ? 'is-active' : ''} />
-              {cameraStatus === 'active' ? 'CAMERA ACTIVE' : cameraStatus === 'error' ? 'CAMERA OFFLINE' : 'REQUESTING ACCESS'}
-            </span>
-            <span className="camera-caption-note">LOCAL PREVIEW <b>·</b> NO RECORDING</span>
-          </div>
-        </section>
-
-        <section className="capture-controls" aria-label="Capture controls">
-          <div className="microphone-control">
-            <button
-              className={`microphone-button${isMicrophoneActive ? ' is-listening' : ''}`}
-              type="button"
-              onClick={() => void toggleMicrophone()}
-              disabled={cameraStatus !== 'active' || !isVideoReady}
-              aria-pressed={isMicrophoneActive}
-            >
-              <span className="microphone-button-icon" aria-hidden="true">{isMicrophoneActive ? '■' : '⌁'}</span>
-              {isMicrophoneActive ? 'Stop listening' : 'Start listening'}
-            </button>
-            <span className={`microphone-status${isMicrophoneActive ? ' is-listening' : ''}`} role="status">
-              <i />{microphoneMessage}
-            </span>
-          </div>
-          {capturedFrame && (
-            <div className="captured-frame">
-              <img src={capturedFrame} alt="Most recently captured camera frame" />
-              <span>CAPTURED FRAME <b>{capturedResolution}</b></span>
-            </div>
+        <button
+          className={`microphone-button${isMicrophoneActive ? ' is-listening' : ''}`}
+          type="button"
+          onClick={() => void toggleMicrophone()}
+          disabled={cameraStatus !== 'active' || !isVideoReady}
+          aria-label={isMicrophoneActive ? 'Stop microphone' : 'Start microphone'}
+          aria-pressed={isMicrophoneActive}
+          title={`${isMicrophoneActive ? 'Stop' : 'Start'} microphone${capturedResolution ? ` · captured ${capturedResolution} frame` : ''}`}
+        >
+          {isMicrophoneActive ? (
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.5" /></svg>
+          ) : (
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3" /><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3m-4 0h8" /></svg>
           )}
-        </section>
+          <span className="sr-only">{isMicrophoneActive ? 'Microphone on' : 'Microphone off'}{microphoneMessage}</span>
+        </button>
 
-        <footer className="privacy-note"><span>01</span> THE CAMERA FEED IS NOT UPLOADED OR SAVED.</footer>
+        <footer className="wordmark">JARVIS <span>2.0</span></footer>
       </section>
       <canvas ref={canvasRef} className="capture-canvas" aria-hidden="true" />
     </main>
