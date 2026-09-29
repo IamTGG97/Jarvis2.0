@@ -121,6 +121,7 @@ function App() {
           onClick={() => void toggleMicrophone()}
           disabled={cameraStatus !== 'active' || !isVideoReady}
           aria-label={isMicrophoneActive ? 'Stop microphone' : 'Start microphone'}
+          aria-description={capturedFrame ? 'A still frame has been captured locally.' : undefined}
           aria-pressed={isMicrophoneActive}
           title={`${isMicrophoneActive ? 'Stop' : 'Start'} microphone${capturedResolution ? ` · captured ${capturedResolution} frame` : ''}`}
         >
