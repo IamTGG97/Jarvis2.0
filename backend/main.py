@@ -3,11 +3,14 @@ import os
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from dotenv import load_dotenv
 from openai import APIError, AsyncOpenAI
+from pydantic import BaseModel
 
 load_dotenv()
 
 app = FastAPI(title="Jarvis2.0 Speech API")
 
+class RespondRequest(BaseModel):
+    transcript: str
 
 @app.get("/api/health")
 async def health() -> dict[str, str]:
@@ -44,3 +47,36 @@ async def transcribe(file: UploadFile = File(...)) -> dict[str, str]:
         await client.close()
 
     return {"transcript": result.text}
+
+@app.post("/api/respond")
+async def respond(request: RespondRequest) -> dict[str, str]:
+    transcript = request.transcript.strip()
+    if not transcript:
+        raise HTTPException(status_code=400, detail="Transcript is required.")
+
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="AI response is not configured. Set OPENAI_API_KEY in the backend environment.",
+        )
+
+    client = AsyncOpenAI(api_key=api_key)
+    try:
+        completion = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are Jarvis, a concise and helpful assistant."},
+                {"role": "user", "content": transcript},
+            ],
+        )
+    except APIError as error:
+        raise HTTPException(
+            status_code=502,
+            detail = "The AI provider could not generate a response. Check the API key and model access.",
+            ) from error
+    finally:
+        await client.close()
+
+    response = completion.choices[0].message.content or ""
+    return {"response": response}
