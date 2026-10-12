@@ -1,47 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
 
-type SpeechRecognitionResultLike = ArrayLike<{ transcript: string }> & { isFinal?: boolean }
-
-type SpeechRecognitionEventLike = Event & {
-  resultIndex: number
-  results: ArrayLike<SpeechRecognitionResultLike>
-}
-
-type SpeechRecognitionLike = {
-  continuous: boolean
-  interimResults: boolean
-  lang: string
-  onresult: ((event: SpeechRecognitionEventLike) => void) | null
-  onerror: (() => void) | null
-  start: () => void
-  stop: () => void
-}
-
-type SpeechRecognitionWindow = Window & {
-  SpeechRecognition?: new () => SpeechRecognitionLike
-  webkitSpeechRecognition?: new () => SpeechRecognitionLike
-}
-
 function App() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const microphoneStreamRef = useRef<MediaStream | null>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
-  const speechRecognitionRef = useRef<SpeechRecognitionLike | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
   const speechFrameRef = useRef<number | null>(null)
   const silenceTimerRef = useRef<number | null>(null)
   const detectedSpeechRef = useRef(false)
   const isRecordingRef = useRef(false)
-  const finalTranscriptRef = useRef('')
   const [cameraStatus, setCameraStatus] = useState<'requesting' | 'active' | 'error'>('requesting')
   const [cameraMessage, setCameraMessage] = useState('Waiting for camera permission')
   const [isVideoReady, setIsVideoReady] = useState(false)
-  const [speechState, setSpeechState] = useState<'idle' | 'listening' | 'transcribing'>('idle')
+  const [speechState, setSpeechState] = useState<'idle' | 'listening' | 'transcribing' | 'thinking'>('idle')
   const [speechMessage, setSpeechMessage] = useState('')
   const [transcript, setTranscript] = useState('')
+  const [response, setResponse] = useState('')
   const [capturedFrame, setCapturedFrame] = useState('')
   const [capturedResolution, setCapturedResolution] = useState('')
 
@@ -52,7 +29,6 @@ function App() {
     silenceTimerRef.current = null
     if (speechFrameRef.current !== null) cancelAnimationFrame(speechFrameRef.current)
     speechFrameRef.current = null
-    speechRecognitionRef.current?.stop()
     setSpeechState('transcribing')
     setSpeechMessage('Transcribing')
     recorderRef.current?.stop()
@@ -63,9 +39,8 @@ function App() {
   }
 
   async function transcribeBatch(audio: Blob) {
-    const speechFallback = finalTranscriptRef.current.trim()
     if (!audio.size) {
-      setSpeechMessage(speechFallback || 'No audio captured. Tap to try again.')
+      setSpeechMessage('No audio captured. Tap to try again.')
       setSpeechState('idle')
       return
     }
@@ -76,20 +51,39 @@ function App() {
     try {
       const response = await fetch('/api/transcribe', { method: 'POST', body: formData })
       const result = await response.json() as { transcript?: string; detail?: string }
-      if (!response.ok) throw new Error(result.detail || 'Speech service unavailable')
-      const words = result.transcript?.trim() || speechFallback
+      if (!response.ok) throw new Error(result.detail || 'Local transcription failed.')
+      const words = result.transcript?.trim()
+      if (!words) {
+        setTranscript('')
+        setSpeechMessage('No speech detected. Tap to try again.')
+        return
+      }
+
       setTranscript(words)
-      setSpeechMessage(words ? '' : 'No speech detected. Tap to try again.')
+      setResponse('')
+      setSpeechState('thinking')
+      setSpeechMessage('Thinking')
+
+      const answerResponse = await fetch('/api/respond', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript: words }),
+      })
+      const answer = await answerResponse.json() as { response?: string; detail?: string }
+      if (!answerResponse.ok) throw new Error(answer.detail || 'Local AI response failed.')
+      setResponse(answer.response?.trim() || '')
+      setSpeechMessage('')
     } catch (error) {
-      setTranscript(speechFallback)
-      setSpeechMessage(speechFallback ? '' : error instanceof Error ? error.message : 'Speech service unavailable.')
+      setSpeechMessage(error instanceof Error ? error.message : 'Local speech service unavailable.')
+    } finally {
+      setSpeechState('idle')
     }
-    setSpeechState('idle')
   }
 
   useEffect(() => {
     let isCurrent = true
     let cameraStream: MediaStream | undefined
+    const videoElement = videoRef.current
 
     async function startCamera() {
       if (!navigator.mediaDevices?.getUserMedia) {
@@ -105,7 +99,7 @@ function App() {
           return
         }
 
-        if (videoRef.current) videoRef.current.srcObject = cameraStream
+        if (videoElement) videoElement.srcObject = cameraStream
         setCameraStatus('active')
         setCameraMessage('Camera active')
       } catch (error) {
@@ -126,12 +120,11 @@ function App() {
       isCurrent = false
       if (silenceTimerRef.current !== null) window.clearTimeout(silenceTimerRef.current)
       if (speechFrameRef.current !== null) cancelAnimationFrame(speechFrameRef.current)
-      speechRecognitionRef.current?.stop()
       recorderRef.current?.stream.getTracks().forEach((track) => track.stop())
       cameraStream?.getTracks().forEach((track) => track.stop())
       microphoneStreamRef.current?.getTracks().forEach((track) => track.stop())
       void audioContextRef.current?.close()
-      if (videoRef.current) videoRef.current.srcObject = null
+      if (videoElement) videoElement.srcObject = null
     }
   }, [])
 
@@ -140,7 +133,7 @@ function App() {
       finishUtterance()
       return
     }
-    if (speechState === 'transcribing') return
+    if (speechState === 'transcribing' || speechState === 'thinking') return
 
     const video = videoRef.current
     const canvas = canvasRef.current
@@ -164,8 +157,9 @@ function App() {
       const recorder = new MediaRecorder(microphoneStreamRef.current)
       recorderRef.current = recorder
       audioChunksRef.current = []
-      finalTranscriptRef.current = ''
       setTranscript('')
+      setResponse('')
+      setSpeechMessage('Listening')
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) audioChunksRef.current.push(event.data)
       }
@@ -201,27 +195,6 @@ function App() {
         if (recorder.state === 'recording') speechFrameRef.current = requestAnimationFrame(detectVoiceActivity)
       }
       speechFrameRef.current = requestAnimationFrame(detectVoiceActivity)
-
-      const recognitionWindow = window as SpeechRecognitionWindow
-      const SpeechApi = recognitionWindow.SpeechRecognition || recognitionWindow.webkitSpeechRecognition
-      if (SpeechApi) {
-        const recognition = new SpeechApi()
-        speechRecognitionRef.current = recognition
-        recognition.continuous = true
-        recognition.interimResults = true
-        recognition.lang = 'en-US'
-        recognition.onerror = () => undefined
-        recognition.onresult = (event) => {
-          let interim = ''
-          for (let index = event.resultIndex; index < event.results.length; index += 1) {
-            const phrase = event.results[index][0]?.transcript ?? ''
-            if (event.results[index].isFinal) finalTranscriptRef.current += phrase
-            else interim += phrase
-          }
-          setTranscript(`${finalTranscriptRef.current}${interim}`.trim())
-        }
-        recognition.start()
-      }
     } catch (error) {
       microphoneStreamRef.current?.getTracks().forEach((track) => track.stop())
       microphoneStreamRef.current = null
@@ -254,11 +227,22 @@ function App() {
           <i className={cameraStatus === 'active' ? 'is-active' : ''} />
         </span>
 
-        {speechMessage && (
-          <p className="voice-feedback" aria-live="polite">{transcript || speechMessage}</p>
-        )}
-        {!speechMessage && transcript && (
-          <p className="voice-feedback" aria-live="polite">{transcript}</p>
+        {(transcript || response || speechMessage) && (
+          <div className="voice-feedback" aria-live="polite" role="status">
+            {transcript && (
+              <p className="voice-turn">
+                <span>You</span>
+                {transcript}
+              </p>
+            )}
+            {response && (
+              <p className="voice-turn voice-turn-answer">
+                <span>Jarvis</span>
+                {response}
+              </p>
+            )}
+            {speechMessage && <p className="voice-status">{speechMessage}</p>}
+          </div>
         )}
 
         <button
@@ -266,7 +250,7 @@ function App() {
           type="button"
           onClick={() => void toggleMicrophone()}
           disabled={cameraStatus !== 'active' || !isVideoReady || speechState === 'transcribing'}
-          aria-label={speechState === 'listening' ? 'Stop listening' : speechState === 'transcribing' ? 'Transcribing speech' : 'Start listening'}
+          aria-label={speechState === 'listening' ? 'Stop listening' : speechState === 'transcribing' ? 'Transcribing speech' : speechState === 'thinking' ? 'Generating response' : 'Start listening'}
           aria-description={capturedFrame ? 'A still frame has been captured locally.' : undefined}
           aria-pressed={speechState === 'listening'}
           title={`${speechState === 'listening' ? 'Stop listening' : 'Start listening'}${capturedResolution ? ` · captured ${capturedResolution} frame` : ''}`}
@@ -276,7 +260,7 @@ function App() {
           ) : (
             <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3" /><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3m-4 0h8" /></svg>
           )}
-          <span className="sr-only">{speechState === 'listening' ? 'Listening' : speechState === 'transcribing' ? 'Transcribing' : 'Microphone idle'}</span>
+          <span className="sr-only">{speechState === 'listening' ? 'Listening' : speechState === 'transcribing' ? 'Transcribing' : speechState === 'thinking' ? 'Thinking' : 'Microphone idle'}</span>
         </button>
 
         <footer className="wordmark">JARVIS <span>2.0</span></footer>

@@ -93,11 +93,12 @@
   position: absolute;
   bottom: max(166px, calc(env(safe-area-inset-bottom) + 156px));
   left: 50%;
+  display: flex;
   width: max-content;
   max-width: min(540px, 84vw);
   max-height: 28vh;
   margin: 0;
-  padding: 10px 15px;
+  padding: 8px 15px;
   overflow: auto;
   transform: translateX(-50%);
   border: 1px solid #ffffff42;
@@ -106,10 +107,34 @@
   color: #f7f6f0;
   font-size: 13px;
   line-height: 1.45;
-  text-align: center;
   overflow-wrap: anywhere;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+  flex-direction: column;
+  gap: 7px;
+}
+
+.voice-turn, .voice-status {
+  margin: 0;
+  white-space: pre-wrap;
+  text-align: left;
+}
+
+.voice-turn span {
+  display: block;
+  margin-bottom: 2px;
+  color: #ffffffa6;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.voice-turn-answer span { color: #b3d5b7; }
+
+.voice-status {
+  color: #d0d5cf;
+  text-align: center;
 }
 
 .microphone-button {

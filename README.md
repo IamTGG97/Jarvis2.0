@@ -1,53 +1,56 @@
 # Jarvis2.0
 
-## Speech API (Phase 2)
+Local-first capstone demo: a browser camera preview, microphone capture with
+voice-activity detection, local speech-to-text, and a local AI response.
+Audio and transcript requests stay on this computer; no paid API key is used.
 
-Install the Python dependencies into the project virtual environment:
+## One-time setup
 
-```powershell
-.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
-```
+1. Install [Ollama](https://ollama.com/download) and download the small chat model:
 
-Copy `.env.example` to `.env` and set `OPENAI_API_KEY` in `.env`. Keep `.env` private; Git ignores it.
+   ```powershell
+   ollama pull qwen2.5:1.5b
+   ```
 
-Start the API in one terminal:
+2. Install the Python backend dependencies:
+
+   ```powershell
+   .\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+   ```
+
+   The first transcription downloads the `tiny.en` speech model automatically.
+   That one-time download requires an internet connection; subsequent
+   transcription runs locally.
+
+3. Optional: copy `.env.example` to `.env` to override the Ollama URL or model.
+   `.env` is ignored by Git, and no API key is required.
+
+## Run the demo
+
+Start FastAPI in one PowerShell terminal:
 
 ```powershell
 .\.venv\Scripts\python.exe -m uvicorn main:app --app-dir backend --reload --host 127.0.0.1 --port 8000
 ```
 
-Start the frontend in another terminal:
+Start the frontend in another:
 
 ```powershell
 npm run dev
 ```
 
-Vite proxies `/api` requests to the local FastAPI service. Without `OPENAI_API_KEY`, the health check works, but transcription returns a setup error.
+Open the localhost URL printed by Vite and allow camera/microphone access.
+Press the microphone button, speak, and pause; after silence is detected the
+recorded batch is transcribed locally and sent to Ollama for a text response.
+The first request may take longer while the speech model is downloaded.
 
-# React + TypeScript + Vite
+To override defaults, set `OLLAMA_BASE_URL`, `OLLAMA_MODEL`, and `WHISPER_MODEL`
+in `.env`. The default chat model is intentionally small for computers with limited
+memory; response quality and speed depend on the machine. For a lower-memory
+fallback, install `qwen2.5:0.5b` and set `OLLAMA_MODEL=qwen2.5:0.5b`.
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Run backend tests with:
 
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
-
-- Configure the top-level `parserOptions` property like this:
-
-```js
-   parserOptions: {
-    ecmaVersion: 'latest',
-    sourceType: 'module',
-    project: ['./tsconfig.json', './tsconfig.node.json'],
-    tsconfigRootDir: __dirname,
-   },
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s backend -p "test_*.py" -v
 ```
-
-- Replace `plugin:@typescript-eslint/recommended` to `plugin:@typescript-eslint/recommended-type-checked` or `plugin:@typescript-eslint/strict-type-checked`
-- Optionally add `plugin:@typescript-eslint/stylistic-type-checked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and add `plugin:react/recommended` & `plugin:react/jsx-runtime` to the `extends` list
