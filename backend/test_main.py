@@ -89,6 +89,14 @@ class SpeechApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn(b'"model":"qwen2.5:1.5b"', request_data["body"])
         messages = json.loads(request_data["body"])["messages"]
         self.assertIn(
+            "answer it directly and naturally",
+            messages[0]["content"],
+        )
+        self.assertIn(
+            "Do not claim you lack access to personal preferences",
+            messages[0]["content"],
+        )
+        self.assertIn(
             {"role": "user", "content": "My name is George."},
             messages,
         )

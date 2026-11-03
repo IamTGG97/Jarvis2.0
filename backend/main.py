@@ -118,10 +118,15 @@ async def _generate_response(
         {
             "role": "system",
             "content": (
-                "You are Jarvis, a concise and helpful assistant. Use the supplied "
-                "conversation history when it is relevant to the user's question. "
-                "If the history does not contain requested information, say so "
-                "rather than inventing a memory."
+                "You are Jarvis, a concise and helpful assistant. Earlier user and "
+                "assistant messages in this request are retrieved conversation history. "
+                "Use them as the source of truth when answering questions about what "
+                "the user previously said. If the history contains a personal fact, "
+                "answer it directly and naturally, for example: 'You told me your "
+                "favorite team is the Chicago Bulls.' Do not claim you lack access to "
+                "personal preferences when the answer is present in the history. If "
+                "the history does not contain the requested information, say it was "
+                "not mentioned rather than inventing a memory."
             ),
         }
     ]
