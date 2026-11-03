@@ -1,26 +1,48 @@
+from contextlib import asynccontextmanager
 import io
 import logging
 import os
 import threading
+from typing import AsyncIterator
+from uuid import UUID
 
 import av
 import httpx
+import psycopg
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from huggingface_hub.errors import HfHubHTTPError, LocalEntryNotFoundError
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
+from database import find_conversation_context, initialize_database, save_conversation_turn
+
 load_dotenv()
 
 logger = logging.getLogger(__name__)
-app = FastAPI(title="Jarvis2.0 Local API")
 transcription_model = None
 transcription_lock = threading.Lock()
 
 
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    try:
+        await run_in_threadpool(initialize_database)
+    except (psycopg.Error, RuntimeError) as error:
+        logger.exception("Could not initialize PostgreSQL conversation memory")
+        raise RuntimeError(
+            "Could not connect to PostgreSQL or initialize the Jarvis memory tables. "
+            "Check DB_* settings in the backend .env file."
+        ) from error
+    yield
+
+
+app = FastAPI(title="Jarvis2.0 Local API", lifespan=lifespan)
+
+
 class RespondRequest(BaseModel):
     transcript: str
+    session_id: UUID
 
 
 @app.get("/api/health")
@@ -86,9 +108,32 @@ async def transcribe(file: UploadFile = File(...)) -> dict[str, str]:
     return {"transcript": transcript}
 
 
-async def _generate_response(transcript: str) -> str:
+async def _generate_response(
+    transcript: str,
+    conversation_context: list[dict[str, str]],
+) -> str:
     base_url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
     model = os.getenv("OLLAMA_MODEL", "qwen2.5:1.5b")
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are Jarvis, a concise and helpful assistant. Use the supplied "
+                "conversation history when it is relevant to the user's question. "
+                "If the history does not contain requested information, say so "
+                "rather than inventing a memory."
+            ),
+        }
+    ]
+    for turn in conversation_context:
+        messages.extend(
+            [
+                {"role": "user", "content": turn["transcript"]},
+                {"role": "assistant", "content": turn["response"]},
+            ]
+        )
+    messages.append({"role": "user", "content": transcript})
+
     try:
         async with httpx.AsyncClient(timeout=120) as client:
             result = await client.post(
@@ -96,13 +141,7 @@ async def _generate_response(transcript: str) -> str:
                 json={
                     "model": model,
                     "stream": False,
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": "You are Jarvis, a concise and helpful assistant.",
-                        },
-                        {"role": "user", "content": transcript},
-                    ],
+                    "messages": messages,
                     "options": {"num_ctx": 2048, "num_predict": 160},
                     "keep_alive": "0",
                 },
@@ -148,4 +187,33 @@ async def respond(request: RespondRequest) -> dict[str, str]:
     if not transcript:
         raise HTTPException(status_code=400, detail="Transcript is required.")
 
-    return {"response": await _generate_response(transcript)}
+    try:
+        conversation_context = await run_in_threadpool(
+            find_conversation_context,
+            request.session_id,
+            transcript,
+        )
+    except (psycopg.Error, RuntimeError) as error:
+        logger.exception("Could not retrieve conversation memory")
+        raise HTTPException(
+            status_code=503,
+            detail="Conversation memory is unavailable. Check PostgreSQL and DB_* settings.",
+        ) from error
+
+    response = await _generate_response(transcript, conversation_context)
+
+    try:
+        await run_in_threadpool(
+            save_conversation_turn,
+            request.session_id,
+            transcript,
+            response,
+        )
+    except (psycopg.Error, RuntimeError) as error:
+        logger.exception("Could not save conversation turn")
+        raise HTTPException(
+            status_code=503,
+            detail="Jarvis responded but could not save this turn to conversation memory.",
+        ) from error
+
+    return {"response": response}

@@ -2,6 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import './App.css'
 
 function App() {
+  const [sessionId] = useState(() => {
+    const storageKey = 'jarvis-conversation-session'
+    const existingSessionId = window.localStorage.getItem(storageKey)
+    if (existingSessionId) return existingSessionId
+
+    const newSessionId = window.crypto.randomUUID()
+    window.localStorage.setItem(storageKey, newSessionId)
+    return newSessionId
+  })
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const microphoneStreamRef = useRef<MediaStream | null>(null)
@@ -67,7 +76,7 @@ function App() {
       const answerResponse = await fetch('/api/respond', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript: words }),
+        body: JSON.stringify({ transcript: words, session_id: sessionId }),
       })
       const answer = await answerResponse.json() as { response?: string; detail?: string }
       if (!answerResponse.ok) throw new Error(answer.detail || 'Local AI response failed.')

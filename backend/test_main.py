@@ -1,12 +1,16 @@
 from io import BytesIO
+import json
 import os
 import unittest
 from unittest.mock import patch
+from uuid import UUID
 
 import httpx
 from fastapi import HTTPException, UploadFile
 
 from main import RespondRequest, app, respond, transcribe
+
+TEST_SESSION_ID = UUID("fdde5172-0d09-4eb6-8502-ad4a65448b19")
 
 
 class SpeechApiTests(unittest.IsolatedAsyncioTestCase):
@@ -34,7 +38,9 @@ class SpeechApiTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_rejects_blank_transcript(self) -> None:
         with self.assertRaises(HTTPException) as error:
-            await respond(RespondRequest(transcript="  \n "))
+            await respond(
+                RespondRequest(transcript="  \n ", session_id=TEST_SESSION_ID)
+            )
 
         self.assertEqual(error.exception.status_code, 400)
 
@@ -60,23 +66,69 @@ class SpeechApiTests(unittest.IsolatedAsyncioTestCase):
                 },
             ),
             patch("main.httpx.AsyncClient", return_value=local_client),
+            patch(
+                "main.find_conversation_context",
+                return_value=[
+                    {
+                        "transcript": "My name is George.",
+                        "response": "Nice to meet you, George.",
+                    }
+                ],
+            ) as find_context,
+            patch("main.save_conversation_turn") as save_turn,
         ):
-            result = await respond(RespondRequest(transcript="  Say hello.  "))
+            result = await respond(
+                RespondRequest(
+                    transcript="  What is my name?  ",
+                    session_id=TEST_SESSION_ID,
+                )
+            )
 
         self.assertEqual(result, {"response": "Hello there."})
         self.assertEqual(request_data["url"], "http://localhost:11434/api/chat")
         self.assertIn(b'"model":"qwen2.5:1.5b"', request_data["body"])
-        self.assertIn(b'"content":"Say hello."', request_data["body"])
+        messages = json.loads(request_data["body"])["messages"]
+        self.assertIn(
+            {"role": "user", "content": "My name is George."},
+            messages,
+        )
+        self.assertEqual(messages[-1], {"role": "user", "content": "What is my name?"})
+        find_context.assert_called_once_with(TEST_SESSION_ID, "What is my name?")
+        save_turn.assert_called_once_with(
+            TEST_SESSION_ID,
+            "What is my name?",
+            "Hello there.",
+        )
 
     async def test_reports_ollama_not_running(self) -> None:
         with (
             patch.dict(os.environ, {"OLLAMA_BASE_URL": "http://127.0.0.1:1"}),
             patch("main.httpx.AsyncClient", side_effect=httpx.ConnectError("offline")),
+            patch("main.find_conversation_context", return_value=[]),
             self.assertRaises(HTTPException) as error,
         ):
-            await respond(RespondRequest(transcript="Hello"))
+            await respond(
+                RespondRequest(transcript="Hello", session_id=TEST_SESSION_ID)
+            )
 
         self.assertEqual(error.exception.status_code, 503)
         self.assertIn("Ollama is not running", error.exception.detail)
+
+    async def test_database_failure_returns_service_error(self) -> None:
+        with (
+            patch(
+                "main.find_conversation_context",
+                side_effect=RuntimeError("database configuration missing"),
+            ),
+            self.assertRaises(HTTPException) as error,
+        ):
+            await respond(
+                RespondRequest(transcript="Hello", session_id=TEST_SESSION_ID)
+            )
+
+        self.assertEqual(error.exception.status_code, 503)
+        self.assertIn("Conversation memory is unavailable", error.exception.detail)
+
+
 if __name__ == "__main__":
     unittest.main()
