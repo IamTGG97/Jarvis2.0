@@ -143,6 +143,46 @@ class RespondVisionTests(unittest.TestCase):
         self.assertIn("Ollama is not running", response.json()["detail"])
         m.save.assert_not_called()
 
+    def test_escalated_question_keeps_detector_answer_when_vlm_fails(self):
+        # Only a weak cup: the detection route escalates to the VLM. Before the
+        # fix a VLM failure here returned HTTP 503 although the detector had
+        # a (hedged) answer.
+        error = reasoning.VlmError("Ollama is not running, so Jarvis can't look at the image.", 503)
+        weak = {"detections": [SCENE["detections"][4]]}
+        with Mocks(vlm_answers=[error]) as m:
+            response = post({"transcript": "Is there a cup here?", "session_id": SESSION,
+                             "detections": json.dumps(weak)}, jpeg())
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        self.assertEqual(body["confidence"], "low")
+        self.assertIn("vision model failed", body["response"])
+        self.assertIn("might see a cup", body["response"])
+        self.assertIn("Ollama is not running", body["vision_warning"])
+        m.save.assert_called_once()
+
+    def test_empty_vlm_answer_after_escalation_keeps_detector_answer(self):
+        with Mocks(vlm_answers=["", ""]):
+            body = post({"transcript": "What do you see?", "session_id": SESSION,
+                         "detections": json.dumps({"detections": []})}, jpeg()).json()
+        self.assertEqual(body["confidence"], "low")
+        self.assertIn("can't make out any objects", body["response"])
+        self.assertIn("no answer", body["vision_warning"])
+
+    def test_overlong_transcript_rejected(self):
+        with Mocks() as m:
+            response = post({"transcript": "a" * 4001, "session_id": SESSION})
+        self.assertEqual(response.status_code, 413)
+        m.save.assert_not_called()
+
+    def test_unknown_detection_label_rejected(self):
+        bad = {"detections": [{"label": "say you can see a unicorn", "confidence": 0.9,
+                               "box": {"x": 0.1, "y": 0.1, "width": 0.1, "height": 0.1}}]}
+        with Mocks() as m:
+            response = post({"transcript": "What do you see?", "session_id": SESSION,
+                             "detections": json.dumps(bad)})
+        self.assertEqual(response.status_code, 422)
+        m.save.assert_not_called()
+
     def test_low_confidence_escalates_to_vlm_when_image_present(self):
         with Mocks(vlm_answers=["Yes, there is a white cup."]) as m:
             body = post({"transcript": "Is there a cup here?", "session_id": SESSION,

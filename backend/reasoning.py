@@ -32,6 +32,8 @@ from dataclasses import dataclass, field
 import httpx
 from PIL import Image
 
+from vision import COCO_LABELS
+
 logger = logging.getLogger(__name__)
 
 # Detections at or above this score are treated as reliable. The detector's
@@ -40,6 +42,8 @@ logger = logging.getLogger(__name__)
 # keyboard at 0.36), so they are only ever reported as "might be".
 CONFIDENT = 0.5
 HIGH = 0.75
+
+KNOWN_LABELS = frozenset(COCO_LABELS)
 
 DEFAULT_VLM_MODEL = "moondream"
 
@@ -78,7 +82,7 @@ WORD_TO_LABEL = {
     "anybody": "person", "someone": "person", "somebody": "person", "man": "person",
     "men": "person", "woman": "person", "women": "person", "guy": "person",
     "kid": "person", "kids": "person", "child": "person", "children": "person",
-    "human": "person", "me": "person", "face": "person",
+    "human": "person", "face": "person",
     "phone": "cell phone", "cellphone": "cell phone", "smartphone": "cell phone",
     "iphone": "cell phone", "mobile": "cell phone",
     "tv": "tv", "television": "tv", "monitor": "tv", "screen": "tv",
@@ -122,7 +126,7 @@ VLM_PATTERNS = [
     r"\b(red|blue|green|yellow|purple|pink|black|white|gr[ae]y|brown|silver|gold)\b",
     r"\bbrand\b", r"\blogo\b", r"\bwhat make\b", r"\bwhich make\b", r"\bmanufacturer\b",
     r"\bwhat model\b", r"\bwhich model\b",
-    r"\bwhat does (it|this|that|the [a-z ]+?) say\b", r"\bwhat do(es)? .*\bsays?\b",
+    r"\bwhat does (it|this|that|the [a-z ]+?) say\b", r"\bwhat do(es)? [a-z' ]{0,60}?\bsays?\b",
     r"\bread\b", r"\btext\b", r"\bwritten\b", r"\bwriting\b", r"\bwords?\b", r"\blabel\b",
     r"\bspell", r"\btitle\b",
     r"\bwhich (one )?(is|looks|seems) (the )?(bigger|smaller|larger|taller|shorter|closer|newer|older|"
@@ -133,7 +137,7 @@ VLM_PATTERNS = [
     r"\bcompare\b", r"\bcomparison\b", r"\bdifference\b", r"\bdifferent\b", r"\bsame\b",
     r"\bdescribe\b", r"\bin detail\b", r"\bdetails?\b", r"\blook like\b", r"\blooks? like\b",
     r"\bwhat kind of\b", r"\bwhat type of\b", r"\bwhat sort of\b",
-    r"\bwhat (is|'s) (this|that|it)\b", r"\bwhat are (these|those)\b", r"\bwhats (this|that)\b",
+    r"\bwhat('s| is) (this|that|it)\b", r"\bwhat are (these|those)\b", r"\bwhats (this|that)\b",
     r"\bwhat am i holding\b", r"\bin my hand\b", r"\bholding\b",
     r"\bwearing\b", r"\bmade of\b", r"\bmaterial\b", r"\bshape\b", r"\bpattern\b",
     r"\b(how|do|does) (do |does )?(i|my [a-z]+) look\b",
@@ -147,19 +151,23 @@ DETECTION_PATTERNS = {
     "count": [r"\bhow many\b", r"\bcount\b", r"\bnumber of\b"],
     "list": [
         r"\bwhat (do|can) you see\b", r"\bwhat are you seeing\b", r"\bwhat do you notice\b",
-        r"\bwhat('s| is) (in front of|around|near) (you|me)\b",
+        r"\bwhat('?s| is) (in front of|around|near) (you|me)\b",
         r"\bwhat('s| is) (here|in (the|this) (room|picture|image|frame|view))\b",
         r"\blook around\b", r"\bwhat objects\b", r"\bwhat things\b", r"\bwhat can you spot\b",
         r"\bwhat('s| is| are) (on|behind|next to|near|around|beside) (me|my|the|this)\b",
         r"\bwhat('s| is) (happening|going on) (here|in (the|this) (picture|image|frame|room|photo))\b",
+        r"\blook at (this|that|me)\b",
     ],
-    "locate": [r"\bwhere('s| is| are)\b"],
+    "locate": [r"\bwhere('s| is| are)\b", r"^(show me|point (at|to)|find) (the|my|a|an)\b"],
     "presence": [
         r"\bis there\b", r"\bare there\b", r"\bdo you see\b", r"\bcan you see\b",
         r"\bdo you notice\b", r"\bcan you spot\b", r"\bis (anyone|anybody|someone|somebody)\b",
         r"\b(anyone|anybody|someone|somebody) (here|there|in)\b",
         r"\bam i (in|on) (the )?(frame|view|camera|picture|shot)\b", r"\bsee me\b",
         r"\bvisible\b",
+        r"\bwho('s| is| are) (this|that|there|here|in|behind|next to|with me|in front of)\b",
+        r"\b(is|are) (my|the|a|an|any) [a-z]+( [a-z]+)? (in|on) (the |this )?"
+        r"(picture|frame|view|camera|shot|image|photo)\b",
     ],
 }
 
@@ -175,6 +183,50 @@ VISION_ANCHORS = (
 
 # Telling or asking about remembered facts ("remember my favorite color is
 # green", "what did I say my car looked like") is memory, not vision.
+# Not visual even though they say "see"/"look".
+NOT_VISUAL = (
+    r"\b(can|do) you see (why|how|if|whether|what i mean|my point)\b"
+    r"|\bsee you\b|\blook (it )?up\b|\blook into\b|\blook forward\b|\bwho am i\b"
+    r"|\bwhere('s| is) my [a-z]+ (parked|kept|stored|from)\b"
+)
+
+# With a frame attached, a definite reference plus one of these means the
+# scene ("What color is the mug?"). The broader VLM_PATTERNS are too loose
+# here: they sent "Tell me about the Red Sea", "Is the white house in
+# Washington?" and "What's the difference between a list and a tuple?" to the
+# VLM (minutes on this laptop) just because a frame came along.
+SCENE_DETAIL_PATTERNS = [
+    r"\bwhat colou?rs? (is|are|was)\b", r"\bwhich colou?r\b",
+    r"\bcolou?rs? of (the|my|this|that|these|those)\b",
+    r"\bwhat does (it|this|that|the [a-z ]+?) say\b", r"\bwhat('s| is) written\b",
+    r"\bread (the|this|that|it|these|those)\b",
+    r"\b(what|which) (brand|make|model)\b", r"\blogo\b",
+    r"\bwhat am i holding\b", r"\bin my hands?\b", r"\bwearing\b",
+    r"\bwhat('s| is) (this|that)\b", r"\bwhats (this|that)\b", r"\bwhat are (these|those)\b",
+    r"\bwhich [a-z]+ (is|looks) (the )?(bigger|smaller|larger|taller|shorter|closer|biggest|smallest|"
+    r"largest|tallest|nearest|closest)\b",
+    r"\b(is|are) (it|this|that|these|those|the [a-z]+|my [a-z]+) "
+    r"(on|off|open|closed|empty|full|clean|dirty|broken|plugged in)\b",
+    r"\b(how|do|does) (do |does )?(i|my [a-z]+) look\b", r"\bhow full\b",
+    r"\bdescribe (the|this|my|what)\b", r"\bwhat kind of [a-z]+ is (this|that|it|my)\b",
+]
+
+# A count question about detected objects but with no scene words. Only short
+# forms count: "How many people live in Paris?" must stay text.
+SHORT_COUNT = (
+    r"^(count (the |my |all the )?[a-z]+( (you see|here|in view|in the frame))?"
+    r"|how many [a-z]+( [a-z]+)?( are there| can you see| do you see| are here| here| in view"
+    r"| visible| right now| are visible)?)$"
+)
+
+# First-person statements ("My car is red", "I like the color blue") are
+# facts for memory, not questions about the frame.
+STATEMENT = r"^(i|i'm|im|i've|my|we|our|we're)\b"
+
+# Only the start of a very long transcript is used for routing: the patterns
+# are cheap on normal speech, but a 100k-character transcript took 21 s.
+MAX_ROUTING_CHARS = 1000
+
 MEMORY_TALK = (
     r"^(remember|note that|why|how come|explain)\b|\bfavou?rite\b|\bremember\b"
     r"|\bdid i (say|tell|mention)\b|\bi told you\b|\bdid you say\b"
@@ -325,15 +377,19 @@ def parse_detections(raw: object) -> list[Detection]:
             raise ValueError(
                 "Each detection needs label, confidence and box {x, y, width, height}."
             ) from error
+        if detection.label not in KNOWN_LABELS:
+            raise ValueError(
+                f"Unknown detection label {detection.label[:40]!r}; labels must be detector (COCO) classes."
+            )
         values = (detection.confidence, detection.x, detection.y, detection.width, detection.height)
-        if not detection.label or not all(0.0 <= v <= 1.0 for v in values):
+        if not all(0.0 <= v <= 1.0 for v in values):
             raise ValueError("Detection confidence and box values must be between 0 and 1.")
         parsed.append(detection)
     return parsed
 
 
 def _normalize(question: str) -> str:
-    text = question.lower().replace("’", "'")
+    text = question[:MAX_ROUTING_CHARS].lower().replace("’", "'")
     text = re.sub(r"[^a-z0-9' -]+", " ", text)
     return re.sub(r"\s+", " ", text).strip()
 
@@ -368,8 +424,9 @@ def _unknown_target(text: str) -> str | None:
     """The object noun after "how many"/"is there a"/... when the detector has
     no class for it (e.g. "pens"), else None."""
     match = re.search(
-        r"\b(?:how many|is there an?|are there(?: any)?|do you see (?:an?|any|my|the)?|can you see "
-        r"(?:an?|any|my|the)?|where(?:'s| is| are) (?:my|the|a)?|count(?: the)?|number of)"
+        r"\b(?:how many|is there(?: an?\b)?|are there(?: any\b)?|do you see(?: (?:an?|any|my|the)\b)?"
+        r"|can you see(?: (?:an?|any|my|the)\b)?|where(?:'s| is| are)(?: (?:my|the|a)\b)?"
+        r"|count(?: the\b)?|number of)"
         r"\s*((?:[a-z]+ ){0,2}[a-z]+)",
         text,
     )
@@ -397,7 +454,9 @@ def is_vision_question(
     has_image: bool = False,
 ) -> bool:
     text = _normalize(question)
-    if re.search(MEMORY_TALK, text):
+    if re.search(MEMORY_TALK, text) or re.search(NOT_VISUAL, text):
+        return False
+    if re.search(STATEMENT, text) and "?" not in question[:MAX_ROUTING_CHARS]:
         return False
     if any(re.search(p, text) for p in DETECTION_PATTERNS["list"]):
         return True
@@ -408,14 +467,21 @@ def is_vision_question(
     )
     if visual_kind and anchored:
         return True
-    # "What color is the cup?" / "Which laptop is bigger?" with that object in view.
-    if visual_kind and detections:
-        seen = {d.label for d in detections}
-        if seen.intersection(find_target_labels(text)):
+    has_vision = has_image or detections is not None
+    targets = find_target_labels(text)
+    count_kind = any(re.search(p, text) for p in DETECTION_PATTERNS["count"])
+    # "What color is the cup?" / "Which laptop is bigger?" with that object in
+    # view. Counting needs the short form ("count the cups").
+    if visual_kind and detections and {d.label for d in detections}.intersection(targets):
+        if not count_kind or re.search(SHORT_COUNT, text):
             return True
+    # "Where's my phone?" with a frame: the detector can say it isn't in view.
+    if has_vision and targets and re.search(r"^(where('s| is| are)|show me|point (at|to)|find)\b", text):
+        return True
     # With a frame attached, a definite reference ("the sign", "my mug") to a
-    # detail question means the scene; "What color is a banana?" stays text.
-    if detail_kind and (has_image or detections) and re.search(r"\b(the|my|your|our)\b", text):
+    # scene-detail question means the scene; "What color is a banana?" stays text.
+    if (has_vision and re.search(r"\b(the|my|your|our|this|that)\b", text)
+            and any(re.search(p, text) for p in SCENE_DETAIL_PATTERNS)):
         return True
     return False
 
@@ -459,7 +525,8 @@ def _route(
     subject = _subject_text(text)
     targets = find_target_labels(subject)
     unknown = _unknown_target(subject)
-    if re.search(r"\bam i (in|on|visible)\b|\bsee me\b|\bnotice me\b", text):
+    if re.search(r"\bam i (in|on|visible)\b|\bsee me\b|\bnotice me\b|\blook at me\b"
+                 r"|\bwho('s| is| are)\b", text):
         targets, unknown = ["person"], None
     wants_vlm = any(re.search(p, text) for p in VLM_PATTERNS)
     intent = "attribute"
@@ -614,7 +681,10 @@ def answer_from_detections(decision: RouteDecision, detections: list[Detection])
 
     best = hits[0]
     position = best.as_reference()["position"]
-    if label == "person":
+    if label == "person" and re.search(r"^who\b|\bwho('s| is| are)\b", decision.text):
+        seen = f"one person {position}" if len(hits) == 1 else count_phrase("person", len(hits))
+        text = f"I don't identify people; I can only tell that someone is there. I can see {seen}."
+    elif label == "person":
         yes = "Yes, I" if decision.intent == "presence" else "I"
         if len(hits) == 1:
             text = f"{yes} can see one person {position}."
@@ -667,7 +737,7 @@ def vision_summary(detections: list[Detection] | None) -> str | None:
     for detection in sure[:12]:
         lines.append(f"- {natural_name(detection.label)}, {screen_position(detection)}")
     for detection in unsure[:6]:
-        lines.append(f"- maybe a {natural_name(detection.label)} (not sure)")
+        lines.append(f"- maybe {count_phrase(natural_name(detection.label), 1)} (not sure)")
     lines.append(
         "That list is all you know about the picture: you can't see colors, text, "
         "brands or details, and you never recognize who a person is."
@@ -807,6 +877,15 @@ def encode_for_vlm(image: Image.Image, max_edge: int) -> str:
     return base64.b64encode(buffer.getvalue()).decode("ascii")
 
 
+def _focus_phrase(focus: list[Detection]) -> str:
+    """"the bottle", "the bottle and the cup", or "two laptops" (not "the
+    laptop and laptop") when the focus holds several of one kind."""
+    names = [natural_name(d.label) for d in focus]
+    if len(set(names)) == len(names):
+        return join_words([f"the {name}" for name in names])
+    return _group_phrase(focus)
+
+
 def build_vlm_prompt(question: str, focus: list[Detection], cropped: bool) -> str:
     """Short, plain prompt. Small VLMs follow long instructions poorly, so the
     detector context is one sentence and only about the object in question."""
@@ -814,15 +893,14 @@ def build_vlm_prompt(question: str, focus: list[Detection], cropped: bool) -> st
     if not question.endswith("?"):
         question += "?"
     if focus and cropped:
-        names = join_words([natural_name(d.label) for d in focus])
-        return f"This picture shows {'the ' + names}. {question}"
+        return f"This picture shows {_focus_phrase(focus)}. {question}"
     return question
 
 
 def retry_prompt(question: str, focus: list[Detection]) -> str:
     """Second try after an empty answer. moondream reliably answers
     "describe" requests even when it stops at once on a terse question."""
-    subject = "the " + join_words([natural_name(d.label) for d in focus]) if focus else "this image"
+    subject = _focus_phrase(focus) if focus else "this image"
     question = question.strip()
     if not question.endswith("?"):
         question += "?"

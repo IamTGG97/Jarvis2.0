@@ -221,11 +221,36 @@ async def _save(session_id: UUID, transcript: str, response: str) -> str | None:
         ) from error
 
 
+def _vlm_fallback(
+    decision: reasoning.RouteDecision,
+    detections: list[reasoning.Detection],
+    error: str,
+    detector_answer: reasoning.Answer | None,
+) -> reasoning.Answer | None:
+    """What to say when the VLM failed: the labeled detector-only answer, or,
+    when the question was escalated from the detection route, that route's own
+    (already hedged) answer. None means there is nothing honest to fall back on."""
+    fallback = reasoning.vlm_failure_answer(decision, detections, error)
+    if fallback is None and detector_answer is not None:
+        fallback = reasoning.Answer(
+            "I tried to take a closer look, but the vision model failed. "
+            + detector_answer.response,
+            detector_answer.route,
+            True,
+            detector_answer.objects_referenced,
+            "low",
+            "vision model failed; detector answer kept",
+            vision_warning=error,
+        )
+    return fallback
+
+
 async def _answer_with_vlm(
     transcript: str,
     decision: reasoning.RouteDecision,
     image,
     detections: list[reasoning.Detection],
+    detector_answer: reasoning.Answer | None = None,
 ) -> reasoning.Answer:
     focus, note = reasoning.choose_vlm_focus(decision, detections)
     region = reasoning.crop_for(image, focus)
@@ -244,13 +269,13 @@ async def _answer_with_vlm(
                 )
     except reasoning.VlmError as error:
         logger.warning("Vision-language model failed: %s", error)
-        fallback = reasoning.vlm_failure_answer(decision, detections, str(error))
+        fallback = _vlm_fallback(decision, detections, str(error), detector_answer)
         if fallback is None:
             raise HTTPException(status_code=error.status_code, detail=str(error)) from error
         return fallback
     if not raw:
         message = "The vision model gave no answer for this picture."
-        fallback = reasoning.vlm_failure_answer(decision, detections, message)
+        fallback = _vlm_fallback(decision, detections, message, detector_answer)
         if fallback is None:
             raise HTTPException(status_code=502, detail=message + " Try asking another way.")
         return fallback
@@ -284,17 +309,21 @@ async def _answer(
     decision = reasoning.route_question(transcript, image is not None, detections)
     memory_warning = None
     answer: reasoning.Answer | None = None
+    detector_answer: reasoning.Answer | None = None
 
     if decision.route == "detections":
         outcome = reasoning.answer_from_detections(decision, detections or [])
         if outcome.escalate and image is not None:
             decision.reason = f"escalated to VLM: {outcome.reason}"
             decision.route = "vlm"
+            detector_answer = outcome.answer
         else:
             answer = outcome.answer
 
     if decision.route == "vlm":
-        answer = await _answer_with_vlm(transcript, decision, image, detections or [])
+        answer = await _answer_with_vlm(
+            transcript, decision, image, detections or [], detector_answer
+        )
     elif decision.route == "no_vision":
         answer = reasoning.honest_no_vision(decision)
     elif decision.route == "text":
@@ -366,6 +395,9 @@ def _validation_error(field: str, message: str) -> HTTPException:
     )
 
 
+# A spoken question is a few hundred characters; this only stops huge bodies.
+MAX_TRANSCRIPT_CHARS = 4000
+
 MISSING_TRANSCRIPT = [
     {"type": "missing", "loc": ["body", "transcript"], "msg": "Field required", "input": None}
 ]
@@ -409,6 +441,11 @@ async def respond_vision(request: Request) -> dict:
     transcript = transcript.strip()
     if not transcript:
         raise HTTPException(status_code=400, detail="Transcript is required.")
+    if len(transcript) > MAX_TRANSCRIPT_CHARS:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Transcript must be {MAX_TRANSCRIPT_CHARS} characters or fewer.",
+        )
     try:
         session_id = UUID(session_raw.strip())
     except ValueError:
