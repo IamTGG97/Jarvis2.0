@@ -134,8 +134,44 @@ sends it (as a JPEG, in memory) to `/api/detect` while it is already listening.
 Boxes and labels are drawn over the camera view for a few seconds, and a small
 "Seen: ..." summary with a person indicator appears at the top. If detection
 fails, a short note appears there instead and the voice flow carries on.
-Jarvis does not use these detections in its answers yet (Phase 4). If you ask
-what it sees, the answer is not based on the camera and may be made up.
+The app does not send the frame or detections with the question yet; that
+wiring is the next step (see below). Until then, `/api/respond` tells the model
+it has no camera this turn, so "What do you see?" gets an honest "I can't see
+anything right now" instead of an invented answer.
+
+### Answering questions about the camera frame (backend)
+
+`POST /api/respond/vision` takes `multipart/form-data` with `transcript`,
+`session_id`, and optionally `detections` (the `/api/detect` JSON) and `file`
+(the JPEG/PNG frame, up to 5 MB, kept in memory only). A keyword router picks
+one route per question:
+
+- `text`: no vision needed, the normal memory + qwen answer.
+- `detections`: "what do you see", "how many people", "is there a cup",
+  "where is my bottle". These are answered straight from the detector in
+  milliseconds, with weak detections (under 0.5) phrased as "might be".
+- `vlm`: color, text/brand, comparison, "what is this". The frame (cropped to
+  the object when one is named) goes to a local vision-language model
+  (`VLM_MODEL`, default `moondream`, Apache-2.0).
+- `no_vision`: a visual question arrived without a frame, so Jarvis says it
+  can't see.
+
+The reply is `{"response", "memory_warning", "route", "used_vision",
+"objects_referenced", "confidence", "reason", "vision_warning", "latency_ms"}`.
+Only the text of the turn is saved. Settings: `VLM_MODEL`, `VLM_KEEP_ALIVE`,
+`VLM_TIMEOUT_SECONDS`, `VLM_MAX_IMAGE_EDGE`, `VLM_NUM_PREDICT`. On this 2-core,
+5.9 GB laptop the VLM route is slow and unreliable (see
+`docs/overnight/phase4-vlm-benchmark.md`), and Jarvis says so when it fails.
+
+```powershell
+curl.exe -F "transcript=How many people are here?" -F "session_id=00000000-0000-4000-8000-000000000001" -F "file=@backend/test_data/office_public_domain.jpg;type=image/jpeg" http://127.0.0.1:8000/api/respond/vision
+.\.venv\Scripts\python.exe backend\eval_router.py
+.\.venv\Scripts\python.exe backend\bench_vlm.py --models moondream
+```
+
+(The curl example saves a turn under that session id. Delete it afterwards
+from the conversation menu or with `curl.exe -X DELETE
+http://127.0.0.1:8000/api/sessions/00000000-0000-4000-8000-000000000001`.)
 
 Frontend helper tests (box math for the mirrored `object-fit: cover` video,
 summary text, API errors) run without extra packages:
