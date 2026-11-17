@@ -3,7 +3,12 @@ import unittest
 from unittest.mock import patch
 from uuid import UUID
 
-from database import find_conversation_context, initialize_database, save_conversation_turn
+from database import (
+    find_conversation_context,
+    initialize_database,
+    save_conversation_turn,
+    search_conversation_turns,
+)
 
 TEST_SESSION_ID = UUID("fdde5172-0d09-4eb6-8502-ad4a65448b19")
 
@@ -98,6 +103,16 @@ class DatabaseTests(unittest.TestCase):
         )
         self.assertIn("plainto_tsquery", cursor.executions[1][0])
         self.assertEqual(cursor.executions[1][1][1], TEST_SESSION_ID)
+
+    def test_search_conversation_turns_returns_ranked_rows(self) -> None:
+        ranked = [{"transcript": "Match", "response": "Answer"}]
+        cursor = FakeCursor([ranked])
+
+        with patch("database._connect", return_value=FakeConnection(cursor)):
+            result = search_conversation_turns(TEST_SESSION_ID, "match", 5)
+
+        self.assertEqual(result, ranked)
+        self.assertEqual(cursor.executions[0][1], ("match", TEST_SESSION_ID, 5))
 
     def test_saves_turn_and_creates_session_if_needed(self) -> None:
         cursor = FakeCursor()

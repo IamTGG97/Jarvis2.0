@@ -90,34 +90,58 @@ def find_conversation_context(
         recent_turns = list(reversed(cursor.fetchall()))
         recent_transcripts = {turn["transcript"] for turn in recent_turns}
 
-        cursor.execute(
-            """
-            WITH search_query AS (
-                SELECT replace(
-                    plainto_tsquery('english', %s)::text,
-                    ' & ',
-                    ' | '
-                )::tsquery AS terms
-            )
-            SELECT transcript, response
-            FROM conversation_turns
-            CROSS JOIN search_query
-            WHERE session_id = %s
-                AND search_vector @@ search_query.terms
-            ORDER BY ts_rank(search_vector, search_query.terms) DESC,
-                created_at DESC,
-                id DESC
-            LIMIT %s
-            """,
-            (transcript, session_id, RECENT_TURN_LIMIT + RELEVANT_TURN_LIMIT),
-        )
         relevant_turns = [
             turn
-            for turn in cursor.fetchall()
+            for turn in _search_turns(
+                cursor,
+                session_id,
+                transcript,
+                RECENT_TURN_LIMIT + RELEVANT_TURN_LIMIT,
+            )
             if turn["transcript"] not in recent_transcripts
         ][:RELEVANT_TURN_LIMIT]
 
     return recent_turns + relevant_turns
+
+
+def _search_turns(
+    cursor: psycopg.Cursor,
+    session_id: UUID,
+    query: str,
+    limit: int,
+) -> list[dict[str, str]]:
+    cursor.execute(
+        """
+        WITH search_query AS (
+            SELECT replace(
+                plainto_tsquery('english', %s)::text,
+                ' & ',
+                ' | '
+            )::tsquery AS terms
+        )
+        SELECT transcript, response
+        FROM conversation_turns
+        CROSS JOIN search_query
+        WHERE session_id = %s
+            AND search_vector @@ search_query.terms
+        ORDER BY ts_rank(search_vector, search_query.terms) DESC,
+            created_at DESC,
+            id DESC
+        LIMIT %s
+        """,
+        (query, session_id, limit),
+    )
+    return cursor.fetchall()
+
+
+def search_conversation_turns(
+    session_id: UUID,
+    query: str,
+    limit: int,
+) -> list[dict[str, str]]:
+    """Return the session's turns ranked by keyword relevance (best first)."""
+    with _connect() as connection, connection.cursor() as cursor:
+        return _search_turns(cursor, session_id, query, limit)
 
 
 def save_conversation_turn(
