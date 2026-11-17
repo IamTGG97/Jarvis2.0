@@ -418,3 +418,113 @@ def backfill_embeddings(
             )
             updated += len(rows)
             logger.info("Embedded %d turn(s) so far", updated)
+
+
+# ---------------------------------------------------------------------------
+# Session management and retention
+# ---------------------------------------------------------------------------
+
+SESSION_PREVIEW_CHARS = 80
+
+_SESSION_SUMMARY_SQL = """
+    SELECT session.id, session.created_at, session.updated_at,
+        count(turn.id)::int AS turn_count,
+        (
+            SELECT left(first_turn.transcript, %(preview_chars)s)
+            FROM conversation_turns AS first_turn
+            WHERE first_turn.session_id = session.id
+            ORDER BY first_turn.created_at, first_turn.id
+            LIMIT 1
+        ) AS preview
+    FROM conversation_sessions AS session
+    LEFT JOIN conversation_turns AS turn ON turn.session_id = session.id
+"""
+
+
+def list_sessions(limit: int = 50) -> list[dict]:
+    """Newest-first session summaries with a first-message preview."""
+    with _connect() as connection, connection.cursor() as cursor:
+        cursor.execute(
+            _SESSION_SUMMARY_SQL
+            + """
+            GROUP BY session.id
+            ORDER BY session.updated_at DESC, session.created_at DESC
+            LIMIT %(limit)s
+            """,
+            {"preview_chars": SESSION_PREVIEW_CHARS, "limit": limit},
+        )
+        return cursor.fetchall()
+
+
+def create_session(session_id: UUID) -> dict:
+    with _connect() as connection, connection.cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT INTO conversation_sessions (id)
+            VALUES (%s)
+            RETURNING id, created_at, updated_at, 0 AS turn_count, NULL::text AS preview
+            """,
+            (session_id,),
+        )
+        return cursor.fetchone()
+
+
+def delete_session(session_id: UUID) -> bool:
+    """Delete a session and (by ON DELETE CASCADE) all of its turns."""
+    with _connect() as connection, connection.cursor() as cursor:
+        cursor.execute(
+            "DELETE FROM conversation_sessions WHERE id = %s",
+            (session_id,),
+        )
+        return cursor.rowcount > 0
+
+
+def get_session_turns(session_id: UUID, limit: int = 200) -> list[dict] | None:
+    """The session's newest ``limit`` turns, oldest first; None if no session."""
+    with _connect() as connection, connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT 1 FROM conversation_sessions WHERE id = %s",
+            (session_id,),
+        )
+        if cursor.fetchone() is None:
+            return None
+        cursor.execute(
+            """
+            SELECT id, transcript, response, created_at
+            FROM conversation_turns
+            WHERE session_id = %s
+            ORDER BY created_at DESC, id DESC
+            LIMIT %s
+            """,
+            (session_id, limit),
+        )
+        return list(reversed(cursor.fetchall()))
+
+
+def retention_days() -> int | None:
+    """MEMORY_RETENTION_DAYS as a positive int, or None when retention is off."""
+    raw = os.getenv("MEMORY_RETENTION_DAYS", "").strip()
+    if not raw:
+        return None
+    try:
+        days = int(raw)
+    except ValueError as error:
+        raise RuntimeError(
+            f"MEMORY_RETENTION_DAYS must be a whole number of days, got {raw!r}."
+        ) from error
+    return days if days > 0 else None
+
+
+def purge_expired_sessions(days: int) -> int:
+    """Delete sessions (and their turns) not updated in ``days`` days."""
+    if days <= 0:
+        raise ValueError("Retention days must be positive.")
+    with _connect() as connection, connection.cursor() as cursor:
+        cursor.execute(
+            """
+            DELETE FROM conversation_sessions
+            WHERE updated_at < now() - make_interval(days => %s)
+            """,
+            (days,),
+        )
+        return cursor.rowcount

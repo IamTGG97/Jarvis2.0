@@ -16,11 +16,16 @@ TEST_SESSION_ID = UUID("fdde5172-0d09-4eb6-8502-ad4a65448b19")
 
 class SpeechApiTests(unittest.IsolatedAsyncioTestCase):
     def test_routes_are_registered(self) -> None:
-        route_paths = {route.path for route in app.routes}
+        # Included routers are not plain routes in this FastAPI version, so read
+        # the paths from the OpenAPI schema instead of app.routes.
+        route_paths = set(app.openapi()["paths"])
 
         self.assertIn("/api/health", route_paths)
         self.assertIn("/api/transcribe", route_paths)
         self.assertIn("/api/respond", route_paths)
+        self.assertIn("/api/sessions", route_paths)
+        self.assertIn("/api/sessions/{session_id}", route_paths)
+        self.assertIn("/api/sessions/{session_id}/turns", route_paths)
 
     async def test_rejects_empty_audio(self) -> None:
         upload = UploadFile(file=BytesIO(b""), filename="empty.webm")

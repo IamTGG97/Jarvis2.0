@@ -18,6 +18,8 @@ from starlette.concurrency import run_in_threadpool
 from database import initialize_database
 from memory import remember_turn, retrieve_memory
 from memory_prompt import build_chat_messages
+from retention import start_retention_task
+from sessions_api import router as sessions_router
 
 load_dotenv()
 
@@ -36,10 +38,16 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
             "Could not connect to PostgreSQL or initialize the Jarvis memory tables. "
             "Check DB_* settings in the backend .env file."
         ) from error
-    yield
+    retention_task = start_retention_task()
+    try:
+        yield
+    finally:
+        if retention_task is not None:
+            retention_task.cancel()
 
 
 app = FastAPI(title="Jarvis2.0 Local API", lifespan=lifespan)
+app.include_router(sessions_router)
 
 
 class RespondRequest(BaseModel):

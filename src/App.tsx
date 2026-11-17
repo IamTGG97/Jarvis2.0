@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
+import SessionMenu from './SessionMenu'
+import { fetchSessionTurns, SESSION_STORAGE_KEY } from './sessionsApi'
 
 function App() {
-  const [sessionId] = useState(() => {
-    const storageKey = 'jarvis-conversation-session'
-    const existingSessionId = window.localStorage.getItem(storageKey)
+  const [sessionId, setSessionId] = useState(() => {
+    const existingSessionId = window.localStorage.getItem(SESSION_STORAGE_KEY)
     if (existingSessionId) return existingSessionId
 
     const newSessionId = window.crypto.randomUUID()
-    window.localStorage.setItem(storageKey, newSessionId)
+    window.localStorage.setItem(SESSION_STORAGE_KEY, newSessionId)
     return newSessionId
   })
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -30,6 +31,32 @@ function App() {
   const [response, setResponse] = useState('')
   const [capturedFrame, setCapturedFrame] = useState('')
   const [capturedResolution, setCapturedResolution] = useState('')
+  const [memoryWarning, setMemoryWarning] = useState('')
+  const sessionSwitchRef = useRef(0)
+
+  async function switchSession(nextSessionId: string) {
+    const switchId = ++sessionSwitchRef.current
+    window.localStorage.setItem(SESSION_STORAGE_KEY, nextSessionId)
+    setSessionId(nextSessionId)
+    setTranscript('')
+    setResponse('')
+    setMemoryWarning('')
+    setSpeechMessage('')
+    try {
+      const turns = await fetchSessionTurns(nextSessionId)
+      if (switchId !== sessionSwitchRef.current) return
+      const lastTurn = turns[turns.length - 1]
+      if (lastTurn) {
+        setTranscript(lastTurn.transcript)
+        setResponse(lastTurn.response)
+      } else {
+        setSpeechMessage('New conversation')
+      }
+    } catch (error) {
+      if (switchId !== sessionSwitchRef.current) return
+      setSpeechMessage(error instanceof Error ? error.message : 'Could not load the conversation.')
+    }
+  }
 
   const finishUtterance = () => {
     if (!isRecordingRef.current) return
@@ -78,9 +105,10 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ transcript: words, session_id: sessionId }),
       })
-      const answer = await answerResponse.json() as { response?: string; detail?: string }
+      const answer = await answerResponse.json() as { response?: string; detail?: string; memory_warning?: string | null }
       if (!answerResponse.ok) throw new Error(answer.detail || 'Local AI response failed.')
       setResponse(answer.response?.trim() || '')
+      setMemoryWarning(answer.memory_warning || '')
       setSpeechMessage('')
     } catch (error) {
       setSpeechMessage(error instanceof Error ? error.message : 'Local speech service unavailable.')
@@ -168,6 +196,7 @@ function App() {
       audioChunksRef.current = []
       setTranscript('')
       setResponse('')
+      setMemoryWarning('')
       setSpeechMessage('Listening')
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) audioChunksRef.current.push(event.data)
@@ -236,7 +265,13 @@ function App() {
           <i className={cameraStatus === 'active' ? 'is-active' : ''} />
         </span>
 
-        {(transcript || response || speechMessage) && (
+        <SessionMenu
+          activeSessionId={sessionId}
+          disabled={speechState !== 'idle'}
+          onSelectSession={(nextSessionId) => void switchSession(nextSessionId)}
+        />
+
+        {(transcript || response || speechMessage || memoryWarning) && (
           <div className="voice-feedback" aria-live="polite" role="status">
             {transcript && (
               <p className="voice-turn">
@@ -250,6 +285,7 @@ function App() {
                 {response}
               </p>
             )}
+            {memoryWarning && <p className="voice-status voice-warning">{memoryWarning}</p>}
             {speechMessage && <p className="voice-status">{speechMessage}</p>}
           </div>
         )}
