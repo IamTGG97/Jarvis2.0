@@ -1,0 +1,1464 @@
+{
+  "summary": {
+    "questions": 35,
+    "all": {
+      "n": 28,
+      "recall@1": 0.893,
+      "recall@3": 0.929,
+      "recall@5": 1.0,
+      "mrr": 0.929,
+      "context_hit": 0.929,
+      "avg_noise@3": 0.96,
+      "answer_accuracy": 0.893
+    },
+    "exact": {
+      "n": 15,
+      "recall@1": 1.0,
+      "recall@3": 1.0,
+      "recall@5": 1.0,
+      "mrr": 1.0,
+      "context_hit": 1.0,
+      "avg_noise@3": 0.87,
+      "answer_accuracy": 1.0
+    },
+    "paraphrase": {
+      "n": 13,
+      "recall@1": 0.769,
+      "recall@3": 0.846,
+      "recall@5": 1.0,
+      "mrr": 0.846,
+      "context_hit": 0.846,
+      "avg_noise@3": 1.08,
+      "answer_accuracy": 0.769
+    },
+    "negative_avg_noise@3": 3,
+    "negative_answer_accuracy": 1.0,
+    "statement_ack_accuracy": 1.0,
+    "unsupported_n": 6,
+    "unsupported_admit_rate": 0.667,
+    "decoy_leaks": 0,
+    "avg_context_turns": 5.09,
+    "avg_context_tokens": 86,
+    "max_context_tokens": 116,
+    "avg_retrieval_ms": 1528.6,
+    "avg_query_embed_ms": 1281.6,
+    "avg_answer_ms": 27519,
+    "mode": "hybrid",
+    "backfill_seconds": 14.76,
+    "backfill_turns": 34
+  },
+  "results": [
+    {
+      "id": "team_exact",
+      "kind": "exact",
+      "question": "What is my favorite basketball team?",
+      "search_rank": 1,
+      "noise_at_3": 2,
+      "context_hit": true,
+      "context_turns": 6,
+      "context_tokens": 116,
+      "decoy_leak": false,
+      "retrieval_ms": 1274.8778000241145,
+      "embed_ms": 1077.0688999909908,
+      "answer": "Your favorite basketball team is the Chicago Bulls.",
+      "answer_correct": true,
+      "admitted_missing": false,
+      "answer_ms": 24335.025200038217,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "My favorite basketball team is the Chicago Bulls.",
+          "response": "Great choice. The Bulls have a long history. I'll remember that."
+        },
+        {
+          "transcript": "How many teams are in the NBA?",
+          "response": "There are 30 teams in the NBA, split between the Eastern and Western Conferences."
+        },
+        {
+          "transcript": "What's your favorite color?",
+          "response": "I don't have personal favorites, but many people like blue."
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "team_said",
+      "kind": "exact",
+      "question": "What did I say my favorite team was?",
+      "search_rank": 1,
+      "noise_at_3": 2,
+      "context_hit": true,
+      "context_turns": 6,
+      "context_tokens": 116,
+      "decoy_leak": false,
+      "retrieval_ms": 1332.9429000150412,
+      "embed_ms": 1132.7372000087053,
+      "answer": "You said your favorite basketball team is the Chicago Bulls.",
+      "answer_correct": true,
+      "admitted_missing": false,
+      "answer_ms": 23350.78760003671,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "My favorite basketball team is the Chicago Bulls.",
+          "response": "Great choice. The Bulls have a long history. I'll remember that."
+        },
+        {
+          "transcript": "How many teams are in the NBA?",
+          "response": "There are 30 teams in the NBA, split between the Eastern and Western Conferences."
+        },
+        {
+          "transcript": "What's your favorite color?",
+          "response": "I don't have personal favorites, but many people like blue."
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "team_para",
+      "kind": "paraphrase",
+      "question": "Which squad do I root for?",
+      "search_rank": 1,
+      "noise_at_3": 1,
+      "context_hit": true,
+      "context_turns": 5,
+      "context_tokens": 83,
+      "decoy_leak": false,
+      "retrieval_ms": 1338.1652999669313,
+      "embed_ms": 1115.8950000535697,
+      "answer": "You root for the Chicago Bulls. They have a rich history in basketball.",
+      "answer_correct": true,
+      "admitted_missing": false,
+      "answer_ms": 23701.716999989003,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "My favorite basketball team is the Chicago Bulls.",
+          "response": "Great choice. The Bulls have a long history. I'll remember that."
+        },
+        {
+          "transcript": "Who won the World Cup in 2018?",
+          "response": "France won the 2018 FIFA World Cup."
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "sister_exact",
+      "kind": "exact",
+      "question": "What's my sister's name?",
+      "search_rank": 1,
+      "noise_at_3": 2,
+      "context_hit": true,
+      "context_turns": 6,
+      "context_tokens": 106,
+      "decoy_leak": false,
+      "retrieval_ms": 1365.6919999048114,
+      "embed_ms": 1130.7488000020385,
+      "answer": "Priya",
+      "answer_correct": true,
+      "admitted_missing": false,
+      "answer_ms": 22098.97019993514,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "My sister's name is Priya and she lives in Denver.",
+          "response": "Nice, Priya in Denver. Thanks for telling me about her."
+        },
+        {
+          "transcript": "My dog is a golden retriever named Max.",
+          "response": "Max sounds lovely. Golden retrievers are very friendly dogs."
+        },
+        {
+          "transcript": "What's a good name for a goldfish?",
+          "response": "How about Bubbles, Finn, or Goldie?"
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "sister_para",
+      "kind": "paraphrase",
+      "question": "Who is my sibling?",
+      "search_rank": 1,
+      "noise_at_3": 0,
+      "context_hit": true,
+      "context_turns": 4,
+      "context_tokens": 64,
+      "decoy_leak": false,
+      "retrieval_ms": 1254.3520999606699,
+      "embed_ms": 1063.1267999997362,
+      "answer": "Your sibling's name is Priya.",
+      "answer_correct": true,
+      "admitted_missing": false,
+      "answer_ms": 21264.521699980833,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "My sister's name is Priya and she lives in Denver.",
+          "response": "Nice, Priya in Denver. Thanks for telling me about her."
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "sister_city",
+      "kind": "exact",
+      "question": "Where does Priya live?",
+      "search_rank": 1,
+      "noise_at_3": 0,
+      "context_hit": true,
+      "context_turns": 4,
+      "context_tokens": 64,
+      "decoy_leak": false,
+      "retrieval_ms": 1332.3397999629378,
+      "embed_ms": 1141.502899932675,
+      "answer": "Priya lives in Denver.",
+      "answer_correct": true,
+      "admitted_missing": false,
+      "answer_ms": 20845.515300054103,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "My sister's name is Priya and she lives in Denver.",
+          "response": "Nice, Priya in Denver. Thanks for telling me about her."
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "allergy_exact",
+      "kind": "exact",
+      "question": "What am I allergic to?",
+      "search_rank": 1,
+      "noise_at_3": 0,
+      "context_hit": true,
+      "context_turns": 4,
+      "context_tokens": 64,
+      "decoy_leak": false,
+      "retrieval_ms": 1335.7174000702798,
+      "embed_ms": 1103.636300074868,
+      "answer": "You are allergic to peanuts.",
+      "answer_correct": true,
+      "admitted_missing": false,
+      "answer_ms": 21447.091600042768,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "Just so you know, I'm allergic to peanuts.",
+          "response": "Thanks for letting me know. I'll keep your peanut allergy in mind."
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "allergy_para",
+      "kind": "paraphrase",
+      "question": "Is there any food I need to avoid?",
+      "search_rank": 4,
+      "noise_at_3": 3,
+      "context_hit": false,
+      "context_turns": 6,
+      "context_tokens": 104,
+      "decoy_leak": false,
+      "retrieval_ms": 1375.2713999710977,
+      "embed_ms": 1172.1328999847174,
+      "answer": "No, there's anything specific you need to avoid. You enjoy pad thai, which is delicious and has a mix of sweet, salty, and tangy flavors.",
+      "answer_correct": false,
+      "admitted_missing": false,
+      "answer_ms": 40623.67770005949,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "My favorite food is pad thai.",
+          "response": "Pad thai is delicious, sweet, salty, and tangy."
+        },
+        {
+          "transcript": "I take my coffee with oat milk and no sugar.",
+          "response": "Oat milk, no sugar. Got it."
+        },
+        {
+          "transcript": "How much water should I drink a day?",
+          "response": "Many adults aim for roughly eight cups, but needs vary with activity and climate."
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "dog_exact",
+      "kind": "exact",
+      "question": "What is my dog's name?",
+      "search_rank": 1,
+      "noise_at_3": 2,
+      "context_hit": true,
+      "context_turns": 6,
+      "context_tokens": 106,
+      "decoy_leak": false,
+      "retrieval_ms": 1285.9234999632463,
+      "embed_ms": 1112.5852999975905,
+      "answer": "Max.",
+      "answer_correct": true,
+      "admitted_missing": false,
+      "answer_ms": 28051.792999962345,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "My sister's name is Priya and she lives in Denver.",
+          "response": "Nice, Priya in Denver. Thanks for telling me about her."
+        },
+        {
+          "transcript": "My dog is a golden retriever named Max.",
+          "response": "Max sounds lovely. Golden retrievers are very friendly dogs."
+        },
+        {
+          "transcript": "What's a good name for a goldfish?",
+          "response": "How about Bubbles, Finn, or Goldie?"
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "dog_para",
+      "kind": "paraphrase",
+      "question": "What's my pet called?",
+      "search_rank": 1,
+      "noise_at_3": 0,
+      "context_hit": true,
+      "context_turns": 4,
+      "context_tokens": 63,
+      "decoy_leak": false,
+      "retrieval_ms": 1521.0600999416783,
+      "embed_ms": 1146.2586999405175,
+      "answer": "Max is your pet dog.",
+      "answer_correct": true,
+      "admitted_missing": false,
+      "answer_ms": 22890.09149989579,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "My dog is a golden retriever named Max.",
+          "response": "Max sounds lovely. Golden retrievers are very friendly dogs."
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "job_exact",
+      "kind": "exact",
+      "question": "Where do I work?",
+      "search_rank": 1,
+      "noise_at_3": 1,
+      "context_hit": true,
+      "context_turns": 5,
+      "context_tokens": 93,
+      "decoy_leak": false,
+      "retrieval_ms": 1330.3033000556752,
+      "embed_ms": 1142.1104000182822,
+      "answer": "You work as a nurse at the children's hospital.",
+      "answer_correct": true,
+      "admitted_missing": false,
+      "answer_ms": 28112.127500004135,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "I work as a nurse at the children's hospital.",
+          "response": "That's important work. Thank you for caring for kids."
+        },
+        {
+          "transcript": "Explain how a car engine works.",
+          "response": "A car engine burns fuel and air in cylinders, which pushes pistons that turn the crankshaft."
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "job_para",
+      "kind": "paraphrase",
+      "question": "What do I do for a living?",
+      "search_rank": 1,
+      "noise_at_3": 2,
+      "context_hit": true,
+      "context_turns": 6,
+      "context_tokens": 104,
+      "decoy_leak": false,
+      "retrieval_ms": 1403.4296999452636,
+      "embed_ms": 1104.1503000305966,
+      "answer": "You work as a nurse at the children's hospital.",
+      "answer_correct": true,
+      "admitted_missing": false,
+      "answer_ms": 28820.919399964623,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "Hey Jarvis, good morning.",
+          "response": "Good morning! How can I help you today?"
+        },
+        {
+          "transcript": "My sister's name is Priya and she lives in Denver.",
+          "response": "Nice, Priya in Denver. Thanks for telling me about her."
+        },
+        {
+          "transcript": "I work as a nurse at the children's hospital.",
+          "response": "That's important work. Thank you for caring for kids."
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "hometown_exact",
+      "kind": "exact",
+      "question": "Where did I grow up?",
+      "search_rank": 1,
+      "noise_at_3": 0,
+      "context_hit": true,
+      "context_turns": 4,
+      "context_tokens": 61,
+      "decoy_leak": false,
+      "retrieval_ms": 1590.249600005336,
+      "embed_ms": 1331.9555000634864,
+      "answer": "You grew up on Maple Avenue in Columbus, Ohio.",
+      "answer_correct": true,
+      "admitted_missing": false,
+      "answer_ms": 22589.847199968062,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "I grew up on Maple Avenue in Columbus, Ohio.",
+          "response": "Columbus, Ohio. That's a nice place to grow up."
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "hometown_para",
+      "kind": "paraphrase",
+      "question": "Which city am I originally from?",
+      "search_rank": 1,
+      "noise_at_3": 2,
+      "context_hit": true,
+      "context_turns": 5,
+      "context_tokens": 87,
+      "decoy_leak": false,
+      "retrieval_ms": 1971.0126999998465,
+      "embed_ms": 1640.1874999282882,
+      "answer": "You are originally from Columbus, Ohio.",
+      "answer_correct": true,
+      "admitted_missing": false,
+      "answer_ms": 23629.829399986193,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "My sister's name is Priya and she lives in Denver.",
+          "response": "Nice, Priya in Denver. Thanks for telling me about her."
+        },
+        {
+          "transcript": "I grew up on Maple Avenue in Columbus, Ohio.",
+          "response": "Columbus, Ohio. That's a nice place to grow up."
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "birthday_exact",
+      "kind": "exact",
+      "question": "When is my birthday?",
+      "search_rank": 1,
+      "noise_at_3": 0,
+      "context_hit": true,
+      "context_turns": 4,
+      "context_tokens": 54,
+      "decoy_leak": false,
+      "retrieval_ms": 2045.069699990563,
+      "embed_ms": 1760.3115000529215,
+      "answer": "Your birthday is March 14th.",
+      "answer_correct": true,
+      "admitted_missing": false,
+      "answer_ms": 21981.243400019594,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "My birthday is March 14th.",
+          "response": "Noted, March 14th. That's also Pi Day!"
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "birthday_para",
+      "kind": "paraphrase",
+      "question": "What date was I born on?",
+      "search_rank": 1,
+      "noise_at_3": 0,
+      "context_hit": true,
+      "context_turns": 4,
+      "context_tokens": 54,
+      "decoy_leak": false,
+      "retrieval_ms": 1944.5815000217408,
+      "embed_ms": 1379.888299969025,
+      "answer": "You were born on March 14th.",
+      "answer_correct": true,
+      "admitted_missing": false,
+      "answer_ms": 21853.32379990723,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "My birthday is March 14th.",
+          "response": "Noted, March 14th. That's also Pi Day!"
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "car_exact",
+      "kind": "exact",
+      "question": "What car do I drive?",
+      "search_rank": 1,
+      "noise_at_3": 1,
+      "context_hit": true,
+      "context_turns": 5,
+      "context_tokens": 85,
+      "decoy_leak": false,
+      "retrieval_ms": 3515.1901999488473,
+      "embed_ms": 3134.4560999423265,
+      "answer": "You drive a blue 2015 Honda Civic.",
+      "answer_correct": true,
+      "admitted_missing": false,
+      "answer_ms": 23669.997100019827,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "I drive a blue 2015 Honda Civic.",
+          "response": "A Honda Civic is a reliable car."
+        },
+        {
+          "transcript": "Explain how a car engine works.",
+          "response": "A car engine burns fuel and air in cylinders, which pushes pistons that turn the crankshaft."
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "car_para",
+      "kind": "paraphrase",
+      "question": "What kind of vehicle do I own?",
+      "search_rank": 1,
+      "noise_at_3": 0,
+      "context_hit": true,
+      "context_turns": 4,
+      "context_tokens": 54,
+      "decoy_leak": false,
+      "retrieval_ms": 2468.613200006075,
+      "embed_ms": 2102.3027999326587,
+      "answer": "You own a blue 2015 Honda Civic.",
+      "answer_correct": true,
+      "admitted_missing": false,
+      "answer_ms": 22396.549600060098,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "I drive a blue 2015 Honda Civic.",
+          "response": "A Honda Civic is a reliable car."
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "cello_exact",
+      "kind": "exact",
+      "question": "What instrument am I learning to play?",
+      "search_rank": 1,
+      "noise_at_3": 0,
+      "context_hit": true,
+      "context_turns": 4,
+      "context_tokens": 62,
+      "decoy_leak": false,
+      "retrieval_ms": 1933.8896999834105,
+      "embed_ms": 1622.3387999925762,
+      "answer": "You are learning to play the cello.",
+      "answer_correct": true,
+      "admitted_missing": false,
+      "answer_ms": 25897.609199979343,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "I'm learning to play the cello.",
+          "response": "The cello has a beautiful sound. Good luck with your practice."
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "cello_para",
+      "kind": "paraphrase",
+      "question": "What music lessons am I taking?",
+      "search_rank": 2,
+      "noise_at_3": 1,
+      "context_hit": true,
+      "context_turns": 5,
+      "context_tokens": 80,
+      "decoy_leak": false,
+      "retrieval_ms": 1290.0357000762597,
+      "embed_ms": 1100.1495000673458,
+      "answer": "You haven't mentioned any music lessons yet.",
+      "answer_correct": false,
+      "admitted_missing": true,
+      "answer_ms": 26267.191600054502,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "I'm learning to play the cello.",
+          "response": "The cello has a beautiful sound. Good luck with your practice."
+        },
+        {
+          "transcript": "I take my coffee with oat milk and no sugar.",
+          "response": "Oat milk, no sugar. Got it."
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "dentist_exact",
+      "kind": "exact",
+      "question": "When is my dentist appointment?",
+      "search_rank": 1,
+      "noise_at_3": 0,
+      "context_hit": true,
+      "context_turns": 4,
+      "context_tokens": 59,
+      "decoy_leak": false,
+      "retrieval_ms": 1331.8714000051841,
+      "embed_ms": 1127.6641000295058,
+      "answer": "Your dentist appointment is next Tuesday at 3 pm.",
+      "answer_correct": true,
+      "admitted_missing": false,
+      "answer_ms": 23571.26250001602,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "My dentist appointment is next Tuesday at 3 pm.",
+          "response": "Okay, dentist next Tuesday at 3 pm."
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "dentist_para",
+      "kind": "paraphrase",
+      "question": "When do I get my teeth checked?",
+      "search_rank": 1,
+      "noise_at_3": 0,
+      "context_hit": true,
+      "context_turns": 4,
+      "context_tokens": 59,
+      "decoy_leak": false,
+      "retrieval_ms": 1289.4258999731392,
+      "embed_ms": 1092.0870000263676,
+      "answer": "You get your teeth checked next Tuesday at 3 pm.",
+      "answer_correct": true,
+      "admitted_missing": false,
+      "answer_ms": 26408.07769994717,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "My dentist appointment is next Tuesday at 3 pm.",
+          "response": "Okay, dentist next Tuesday at 3 pm."
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "food_exact",
+      "kind": "exact",
+      "question": "What is my favorite food?",
+      "search_rank": 1,
+      "noise_at_3": 2,
+      "context_hit": true,
+      "context_turns": 6,
+      "context_tokens": 107,
+      "decoy_leak": false,
+      "retrieval_ms": 1360.7120000524446,
+      "embed_ms": 1147.7508000098169,
+      "answer": "Your favorite food is pad thai.",
+      "answer_correct": true,
+      "admitted_missing": false,
+      "answer_ms": 27732.3449999094,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "My favorite basketball team is the Chicago Bulls.",
+          "response": "Great choice. The Bulls have a long history. I'll remember that."
+        },
+        {
+          "transcript": "What's your favorite color?",
+          "response": "I don't have personal favorites, but many people like blue."
+        },
+        {
+          "transcript": "My favorite food is pad thai.",
+          "response": "Pad thai is delicious, sweet, salty, and tangy."
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "food_para",
+      "kind": "paraphrase",
+      "question": "Which dish do I like the most?",
+      "search_rank": 1,
+      "noise_at_3": 2,
+      "context_hit": true,
+      "context_turns": 6,
+      "context_tokens": 112,
+      "decoy_leak": false,
+      "retrieval_ms": 1330.670600058511,
+      "embed_ms": 1136.623700032942,
+      "answer": "You like pad thai.",
+      "answer_correct": true,
+      "admitted_missing": false,
+      "answer_ms": 27772.361499955878,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "What's the weather usually like in the spring?",
+          "response": "Spring is usually mild, with cool mornings, warmer afternoons, and occasional rain."
+        },
+        {
+          "transcript": "What's your favorite color?",
+          "response": "I don't have personal favorites, but many people like blue."
+        },
+        {
+          "transcript": "My favorite food is pad thai.",
+          "response": "Pad thai is delicious, sweet, salty, and tangy."
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "trip_exact",
+      "kind": "exact",
+      "question": "Where am I going on my trip in October?",
+      "search_rank": 1,
+      "noise_at_3": 0,
+      "context_hit": true,
+      "context_turns": 4,
+      "context_tokens": 64,
+      "decoy_leak": false,
+      "retrieval_ms": 1334.1854000464082,
+      "embed_ms": 1130.6765000335872,
+      "answer": "You are going to Japan in October.",
+      "answer_correct": true,
+      "admitted_missing": false,
+      "answer_ms": 25875.23940007668,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "I'm planning a trip to Japan in October.",
+          "response": "Japan in October is lovely, with autumn colors starting to appear."
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "trip_para",
+      "kind": "paraphrase",
+      "question": "What vacation am I planning this fall?",
+      "search_rank": 1,
+      "noise_at_3": 0,
+      "context_hit": true,
+      "context_turns": 4,
+      "context_tokens": 64,
+      "decoy_leak": false,
+      "retrieval_ms": 1306.995499995537,
+      "embed_ms": 1099.5803999248892,
+      "answer": "You are planning a trip to Japan in October.",
+      "answer_correct": true,
+      "admitted_missing": false,
+      "answer_ms": 23670.701899915002,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "I'm planning a trip to Japan in October.",
+          "response": "Japan in October is lovely, with autumn colors starting to appear."
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "coffee_exact",
+      "kind": "exact",
+      "question": "How do I take my coffee?",
+      "search_rank": 1,
+      "noise_at_3": 1,
+      "context_hit": true,
+      "context_turns": 5,
+      "context_tokens": 72,
+      "decoy_leak": false,
+      "retrieval_ms": 1353.6425000056624,
+      "embed_ms": 1139.947099960409,
+      "answer": "You take your coffee with oat milk and no sugar.",
+      "answer_correct": true,
+      "admitted_missing": false,
+      "answer_ms": 32980.10050004814,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "Hey Jarvis, good morning.",
+          "response": "Good morning! How can I help you today?"
+        },
+        {
+          "transcript": "I take my coffee with oat milk and no sugar.",
+          "response": "Oat milk, no sugar. Got it."
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "coffee_para",
+      "kind": "paraphrase",
+      "question": "What should you put in my morning drink?",
+      "search_rank": 4,
+      "noise_at_3": 3,
+      "context_hit": false,
+      "context_turns": 6,
+      "context_tokens": 101,
+      "decoy_leak": false,
+      "retrieval_ms": 1383.2144000334665,
+      "embed_ms": 1169.7545000351965,
+      "answer": "I would recommend adding a splash of fresh lemon for a refreshing taste and a boost of vitamin C.",
+      "answer_correct": false,
+      "admitted_missing": false,
+      "answer_ms": 38421.30160005763,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "Hey Jarvis, good morning.",
+          "response": "Good morning! How can I help you today?"
+        },
+        {
+          "transcript": "Can you say good morning in French?",
+          "response": "Good morning in French is 'bonjour'."
+        },
+        {
+          "transcript": "How much water should I drink a day?",
+          "response": "Many adults aim for roughly eight cups, but needs vary with activity and climate."
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "stmt_color",
+      "kind": "statement",
+      "question": "My favorite color is green.",
+      "search_rank": null,
+      "noise_at_3": 3,
+      "context_hit": null,
+      "context_turns": 6,
+      "context_tokens": 107,
+      "decoy_leak": false,
+      "retrieval_ms": 1399.7126000467688,
+      "embed_ms": 1128.7152000004426,
+      "answer": "Green is a popular choice, I see. Does that match your preferences?",
+      "answer_correct": true,
+      "admitted_missing": false,
+      "answer_ms": 38921.59649997484,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "My favorite basketball team is the Chicago Bulls.",
+          "response": "Great choice. The Bulls have a long history. I'll remember that."
+        },
+        {
+          "transcript": "What's your favorite color?",
+          "response": "I don't have personal favorites, but many people like blue."
+        },
+        {
+          "transcript": "My favorite food is pad thai.",
+          "response": "Pad thai is delicious, sweet, salty, and tangy."
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "stmt_gym",
+      "kind": "statement",
+      "question": "I go to the gym every Monday and Thursday.",
+      "search_rank": null,
+      "noise_at_3": 3,
+      "context_hit": null,
+      "context_turns": 6,
+      "context_tokens": 111,
+      "decoy_leak": false,
+      "retrieval_ms": 1577.9800000600517,
+      "embed_ms": 1369.891699985601,
+      "answer": "You go to the gym every Monday and Thursday.",
+      "answer_correct": true,
+      "admitted_missing": false,
+      "answer_ms": 41127.39799998235,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "What day of the week is it today?",
+          "response": "I can't see a calendar, but your device's clock will show the day."
+        },
+        {
+          "transcript": "My dentist appointment is next Tuesday at 3 pm.",
+          "response": "Okay, dentist next Tuesday at 3 pm."
+        },
+        {
+          "transcript": "How often should I water a cactus?",
+          "response": "Every two to four weeks, letting the soil dry out completely between waterings."
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "stmt_name",
+      "kind": "statement",
+      "question": "By the way, my name is Sam.",
+      "search_rank": null,
+      "noise_at_3": 3,
+      "context_hit": null,
+      "context_turns": 6,
+      "context_tokens": 106,
+      "decoy_leak": false,
+      "retrieval_ms": 1260.70250000339,
+      "embed_ms": 1092.6251000491902,
+      "answer": "Sam, nice to meet you.",
+      "answer_correct": true,
+      "admitted_missing": false,
+      "answer_ms": 32629.06559999101,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "My sister's name is Priya and she lives in Denver.",
+          "response": "Nice, Priya in Denver. Thanks for telling me about her."
+        },
+        {
+          "transcript": "My dog is a golden retriever named Max.",
+          "response": "Max sounds lovely. Golden retrievers are very friendly dogs."
+        },
+        {
+          "transcript": "What's a good name for a goldfish?",
+          "response": "How about Bubbles, Finn, or Goldie?"
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "neg_brother",
+      "kind": "negative",
+      "question": "What is my brother's name?",
+      "search_rank": null,
+      "noise_at_3": 3,
+      "context_hit": null,
+      "context_turns": 6,
+      "context_tokens": 106,
+      "decoy_leak": false,
+      "retrieval_ms": 1427.1890999516472,
+      "embed_ms": 1141.2426999304444,
+      "answer": "You haven't mentioned that to me yet.",
+      "answer_correct": true,
+      "admitted_missing": true,
+      "answer_ms": 32139.103800058365,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "My sister's name is Priya and she lives in Denver.",
+          "response": "Nice, Priya in Denver. Thanks for telling me about her."
+        },
+        {
+          "transcript": "My dog is a golden retriever named Max.",
+          "response": "Max sounds lovely. Golden retrievers are very friendly dogs."
+        },
+        {
+          "transcript": "What's a good name for a goldfish?",
+          "response": "How about Bubbles, Finn, or Goldie?"
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "neg_movie",
+      "kind": "negative",
+      "question": "What is my favorite movie?",
+      "search_rank": null,
+      "noise_at_3": 3,
+      "context_hit": null,
+      "context_turns": 6,
+      "context_tokens": 98,
+      "decoy_leak": false,
+      "retrieval_ms": 1565.0586999254301,
+      "embed_ms": 1347.9667999781668,
+      "answer": "You haven't mentioned that to me yet.",
+      "answer_correct": true,
+      "admitted_missing": true,
+      "answer_ms": 29165.7005000161,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "What's your favorite color?",
+          "response": "I don't have personal favorites, but many people like blue."
+        },
+        {
+          "transcript": "My favorite food is pad thai.",
+          "response": "Pad thai is delicious, sweet, salty, and tangy."
+        },
+        {
+          "transcript": "Recommend a movie for tonight.",
+          "response": "You might enjoy Spirited Away or The Martian."
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "neg_cat",
+      "kind": "negative",
+      "question": "What is my cat's name?",
+      "search_rank": null,
+      "noise_at_3": 3,
+      "context_hit": null,
+      "context_turns": 6,
+      "context_tokens": 106,
+      "decoy_leak": false,
+      "retrieval_ms": 1313.766699982807,
+      "embed_ms": 1135.2476999163628,
+      "answer": "You haven't mentioned your cat's name to me yet.",
+      "answer_correct": true,
+      "admitted_missing": true,
+      "answer_ms": 35281.885000062175,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "My sister's name is Priya and she lives in Denver.",
+          "response": "Nice, Priya in Denver. Thanks for telling me about her."
+        },
+        {
+          "transcript": "My dog is a golden retriever named Max.",
+          "response": "Max sounds lovely. Golden retrievers are very friendly dogs."
+        },
+        {
+          "transcript": "What's a good name for a goldfish?",
+          "response": "How about Bubbles, Finn, or Goldie?"
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    },
+    {
+      "id": "neg_school",
+      "kind": "negative",
+      "question": "Which university did I go to?",
+      "search_rank": null,
+      "noise_at_3": 3,
+      "context_hit": null,
+      "context_turns": 6,
+      "context_tokens": 115,
+      "decoy_leak": false,
+      "retrieval_ms": 1357.4233999243006,
+      "embed_ms": 1083.900299970992,
+      "answer": "You didn't mention which university you went to.",
+      "answer_correct": true,
+      "admitted_missing": true,
+      "answer_ms": 33626.38970010448,
+      "notes": [],
+      "context": [
+        {
+          "transcript": "My favorite basketball team is the Chicago Bulls.",
+          "response": "Great choice. The Bulls have a long history. I'll remember that."
+        },
+        {
+          "transcript": "My sister's name is Priya and she lives in Denver.",
+          "response": "Nice, Priya in Denver. Thanks for telling me about her."
+        },
+        {
+          "transcript": "I grew up on Maple Avenue in Columbus, Ohio.",
+          "response": "Columbus, Ohio. That's a nice place to grow up."
+        },
+        {
+          "transcript": "Thanks, that's helpful.",
+          "response": "You're welcome!"
+        },
+        {
+          "transcript": "What's the capital of Australia?",
+          "response": "The capital of Australia is Canberra."
+        },
+        {
+          "transcript": "How do you spell necessary?",
+          "response": "N-E-C-E-S-S-A-R-Y."
+        }
+      ]
+    }
+  ]
+}

@@ -337,6 +337,16 @@ class RoutePreviewTests(unittest.TestCase):
                 self.assertEqual(response.json()["route"], route)
                 self.assertEqual(response.json()["uses_vision_model"], uses_vlm)
 
+    def test_preview_unknown_when_frame_has_no_detections(self):
+        # The real request would run the detector first ("Can you see me?"
+        # then goes to the detection route), so the preview must not claim "vlm".
+        body = self.preview({"transcript": "Can you see me?", "has_image": True}).json()
+        self.assertIsNone(body["route"])
+        self.assertIsNone(body["uses_vision_model"])
+        # A color question needs the VLM regardless.
+        body = self.preview({"transcript": "What color is my shirt?", "has_image": True}).json()
+        self.assertTrue(body["uses_vision_model"])
+
     def test_preview_validation(self):
         self.assertEqual(self.preview({"transcript": " "}).status_code, 400)
         self.assertEqual(self.preview({"transcript": "a" * 4001}).status_code, 413)

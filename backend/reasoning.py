@@ -227,6 +227,10 @@ STATEMENT = r"^(i|i'm|im|i've|my|we|our|we're)\b"
 # are cheap on normal speech, but a 100k-character transcript took 21 s.
 MAX_ROUTING_CHARS = 1000
 
+# Router reason when a frame came without detections (the API runs the
+# detector first, so the final route is only known after that).
+IMAGE_WITHOUT_DETECTIONS = "image but no detections"
+
 MEMORY_TALK = (
     r"^(remember|note that|why|how come|explain)\b|\bfavou?rite\b|\bremember\b"
     r"|\bdid i (say|tell|mention)\b|\bi told you\b|\bdid you say\b"
@@ -556,7 +560,7 @@ def _route(
 
     if detections is None:
         if has_image:  # API runs the detector first, so this is rare
-            return RouteDecision("vlm", intent, "image but no detections", targets)
+            return RouteDecision("vlm", intent, IMAGE_WITHOUT_DETECTIONS, targets)
         return RouteDecision("no_vision", intent, "no image or detections were sent", targets)
     return RouteDecision("detections", intent, f"{intent} question", targets)
 

@@ -388,6 +388,10 @@ async def respond_route(request: RoutePreviewRequest) -> dict:
         except ValueError as error:
             raise _validation_error("detections", f"Invalid detections: {error}") from None
     decision, uses_vlm = reasoning.expected_route(transcript, request.has_image, detections)
+    if decision.reason == reasoning.IMAGE_WITHOUT_DETECTIONS:
+        # "Can you see me?" with a frame but no detections: the real request
+        # runs the detector first, so the route isn't known yet.
+        return {"route": None, "uses_vision_model": None, "reason": "depends on the detector result"}
     route = "vlm" if uses_vlm else decision.route
     return {"route": route, "uses_vision_model": uses_vlm, "reason": decision.reason}
 
