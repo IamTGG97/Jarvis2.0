@@ -15,7 +15,8 @@ from huggingface_hub.errors import HfHubHTTPError, LocalEntryNotFoundError
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
-from database import find_conversation_context, initialize_database, save_conversation_turn
+from database import initialize_database
+from memory import remember_turn, retrieve_memory
 from memory_prompt import build_chat_messages
 
 load_dotenv()
@@ -173,14 +174,20 @@ async def _generate_response(
 
 
 @app.post("/api/respond")
-async def respond(request: RespondRequest) -> dict[str, str]:
+async def respond(request: RespondRequest) -> dict[str, str | None]:
+    """Answer with conversation memory.
+
+    Returns ``{"response": str, "memory_warning": str | None}``. The warning is
+    set when semantic (embedding) memory was unavailable for this turn, so the
+    UI can say that recall was keyword-only instead of pretending it worked.
+    """
     transcript = request.transcript.strip()
     if not transcript:
         raise HTTPException(status_code=400, detail="Transcript is required.")
 
     try:
-        conversation_context = await run_in_threadpool(
-            find_conversation_context,
+        memory = await run_in_threadpool(
+            retrieve_memory,
             request.session_id,
             transcript,
         )
@@ -191,11 +198,11 @@ async def respond(request: RespondRequest) -> dict[str, str]:
             detail="Conversation memory is unavailable. Check PostgreSQL and DB_* settings.",
         ) from error
 
-    response = await _generate_response(transcript, conversation_context)
+    response = await _generate_response(transcript, memory.turns)
 
     try:
-        await run_in_threadpool(
-            save_conversation_turn,
+        save_warning = await run_in_threadpool(
+            remember_turn,
             request.session_id,
             transcript,
             response,
@@ -207,4 +214,4 @@ async def respond(request: RespondRequest) -> dict[str, str]:
             detail="Jarvis responded but could not save this turn to conversation memory.",
         ) from error
 
-    return {"response": response}
+    return {"response": response, "memory_warning": memory.warning or save_warning}

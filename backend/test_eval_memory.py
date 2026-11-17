@@ -25,7 +25,7 @@ class EvalMemoryTests(unittest.TestCase):
                 self.assertIn(target, keys)
                 # Facts must be outside the recent window so search is exercised.
                 self.assertNotIn(target, recent_keys)
-            if question["kind"] == "negative":
+            if question["kind"] in ("negative", "statement"):
                 self.assertEqual(question["targets"], [])
             else:
                 self.assertTrue(question["expect_any"])
@@ -49,6 +49,11 @@ class EvalMemoryTests(unittest.TestCase):
         self.assertFalse(
             score_answer("I don't know, maybe Priya?", question, MARKERS, ["priya"])
         )
+
+    def test_statements_must_be_acknowledged_not_denied(self) -> None:
+        question = {"kind": "statement", "expect_any": []}
+        self.assertTrue(score_answer("Got it, green it is.", question, MARKERS, []))
+        self.assertFalse(score_answer("You did not mention that.", question, MARKERS, []))
 
     def test_summary_rates(self) -> None:
         results = [

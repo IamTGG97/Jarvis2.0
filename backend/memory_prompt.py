@@ -12,6 +12,8 @@ SYSTEM_PROMPT_INTRO = "You are Jarvis, a concise and helpful voice assistant."
 
 MEMORY_RULES = (
     "Rules:\n"
+    "- When the user tells you something about themselves, acknowledge it "
+    "briefly and naturally; you will remember it.\n"
     "- When the user asks about themselves (their name, family, pets, job, "
     "preferences, plans, or appointments), answer only from the conversation "
     "notes, and say it naturally, for example: 'You told me ...'.\n"

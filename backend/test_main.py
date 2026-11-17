@@ -9,6 +9,7 @@ import httpx
 from fastapi import HTTPException, UploadFile
 
 from main import RespondRequest, _ollama_chat_options, app, respond, transcribe
+from memory import RetrievedMemory
 
 TEST_SESSION_ID = UUID("fdde5172-0d09-4eb6-8502-ad4a65448b19")
 
@@ -67,15 +68,18 @@ class SpeechApiTests(unittest.IsolatedAsyncioTestCase):
             ),
             patch("main.httpx.AsyncClient", return_value=local_client),
             patch(
-                "main.find_conversation_context",
-                return_value=[
-                    {
-                        "transcript": "My name is George.",
-                        "response": "Nice to meet you, George.",
-                    }
-                ],
+                "main.retrieve_memory",
+                return_value=RetrievedMemory(
+                    [
+                        {
+                            "transcript": "My name is George.",
+                            "response": "Nice to meet you, George.",
+                        }
+                    ],
+                    "hybrid",
+                ),
             ) as find_context,
-            patch("main.save_conversation_turn") as save_turn,
+            patch("main.remember_turn", return_value=None) as save_turn,
         ):
             result = await respond(
                 RespondRequest(
@@ -84,7 +88,7 @@ class SpeechApiTests(unittest.IsolatedAsyncioTestCase):
                 )
             )
 
-        self.assertEqual(result, {"response": "Hello there."})
+        self.assertEqual(result, {"response": "Hello there.", "memory_warning": None})
         self.assertEqual(request_data["url"], "http://localhost:11434/api/chat")
         self.assertIn(b'"model":"qwen2.5:1.5b"', request_data["body"])
         self.assertEqual(json.loads(request_data["body"])["keep_alive"], "0")
@@ -102,6 +106,29 @@ class SpeechApiTests(unittest.IsolatedAsyncioTestCase):
             "Hello there.",
         )
 
+    async def test_returns_memory_warning_when_embeddings_fail(self) -> None:
+        with (
+            patch(
+                "main.retrieve_memory",
+                return_value=RetrievedMemory([], "keyword", "keyword only"),
+            ),
+            patch("main._generate_response", return_value="Hi."),
+            patch("main.remember_turn", return_value="saved without vector"),
+        ):
+            result = await respond(RespondRequest(transcript="Hello", session_id=TEST_SESSION_ID))
+
+        self.assertEqual(result["response"], "Hi.")
+        self.assertEqual(result["memory_warning"], "keyword only")
+
+        with (
+            patch("main.retrieve_memory", return_value=RetrievedMemory([], "hybrid")),
+            patch("main._generate_response", return_value="Hi."),
+            patch("main.remember_turn", return_value="saved without vector"),
+        ):
+            result = await respond(RespondRequest(transcript="Hello", session_id=TEST_SESSION_ID))
+
+        self.assertEqual(result["memory_warning"], "saved without vector")
+
     def test_ollama_options_default_and_override(self) -> None:
         with patch.dict(os.environ, {"OLLAMA_TEMPERATURE": ""}):
             self.assertEqual(_ollama_chat_options(), {"num_ctx": 2048, "num_predict": 160})
@@ -112,7 +139,7 @@ class SpeechApiTests(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict(os.environ, {"OLLAMA_BASE_URL": "http://127.0.0.1:1"}),
             patch("main.httpx.AsyncClient", side_effect=httpx.ConnectError("offline")),
-            patch("main.find_conversation_context", return_value=[]),
+            patch("main.retrieve_memory", return_value=RetrievedMemory([], "keyword")),
             self.assertRaises(HTTPException) as error,
         ):
             await respond(
@@ -125,7 +152,7 @@ class SpeechApiTests(unittest.IsolatedAsyncioTestCase):
     async def test_database_failure_returns_service_error(self) -> None:
         with (
             patch(
-                "main.find_conversation_context",
+                "main.retrieve_memory",
                 side_effect=RuntimeError("database configuration missing"),
             ),
             self.assertRaises(HTTPException) as error,

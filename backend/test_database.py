@@ -9,7 +9,10 @@ import psycopg
 
 from database import (
     find_conversation_context,
+    KEYWORD_CANDIDATE_LIMIT,
+    backfill_embeddings,
     fit_context_budget,
+    reciprocal_rank_fusion,
     initialize_database,
     save_conversation_turn,
     search_conversation_turns,
@@ -187,7 +190,71 @@ class DatabaseTests(unittest.TestCase):
         parameters = cursor.executions[0][1]
         self.assertEqual(parameters["query"], "match")
         self.assertEqual(parameters["session_id"], TEST_SESSION_ID)
-        self.assertEqual(parameters["limit"], 5)
+        # Keyword search fetches a fixed candidate pool, then trims to the limit.
+        self.assertEqual(parameters["limit"], KEYWORD_CANDIDATE_LIMIT)
+
+    def test_initialize_adds_embedding_columns_without_extensions(self) -> None:
+        cursor = FakeCursor()
+        with patch("database._connect", return_value=FakeConnection(cursor)):
+            initialize_database()
+
+        sql = "\n".join(query for query, _ in cursor.executions)
+        self.assertIn("ADD COLUMN IF NOT EXISTS embedding REAL[]", sql)
+        self.assertNotIn("CREATE EXTENSION", sql)
+
+    def test_reciprocal_rank_fusion_prefers_turns_found_by_both(self) -> None:
+        keyword = [_turn(1, "a"), _turn(2, "b"), _turn(3, "c")]
+        vector = [_turn(4, "d"), _turn(2, "b")]
+
+        fused = reciprocal_rank_fusion([keyword, vector])
+
+        self.assertEqual([turn["id"] for turn in fused][:3], [2, 4, 1])
+
+    def test_hybrid_context_uses_vector_hits_above_threshold(self) -> None:
+        recent = [_turn(10, "Latest", minute=10)]
+        keyword_hits: list[dict] = []
+        vector_rows = [
+            {**_turn(1, "My team is the Bulls.", minute=1), "embedding": [1.0, 0.0]},
+            {**_turn(2, "Weather chat", minute=2), "embedding": [0.0, 1.0]},
+        ]
+        cursor = FakeCursor([recent, keyword_hits, vector_rows])
+
+        with patch("database._connect", return_value=FakeConnection(cursor)):
+            result = find_conversation_context(
+                TEST_SESSION_ID,
+                "Which squad do I root for?",
+                query_embedding=[0.9, 0.1],
+                embedding_model="nomic-embed-text",
+            )
+
+        self.assertEqual(
+            [turn["transcript"] for turn in result],
+            ["My team is the Bulls.", "Latest"],
+        )
+        vector_parameters = cursor.executions[2][1]
+        self.assertEqual(vector_parameters["model"], "nomic-embed-text")
+        self.assertEqual(vector_parameters["exclude_ids"], [10])
+
+    def test_keyword_only_context_skips_vector_query(self) -> None:
+        cursor = FakeCursor([[], []])
+        with patch("database._connect", return_value=FakeConnection(cursor)):
+            find_conversation_context(TEST_SESSION_ID, "hello")
+        self.assertEqual(len(cursor.executions), 2)
+
+    def test_backfill_embeds_missing_turns_in_batches(self) -> None:
+        batch = [{"id": 7, "transcript": "Q", "response": "A"}]
+        cursor = FakeCursor([batch, []])
+        cursor.executemany = lambda query, rows: cursor.executions.append((query, rows))
+
+        with (
+            patch("database._connect", return_value=FakeConnection(cursor)),
+            patch("database.embed_texts", return_value=[[0.5, 0.5]]) as embed,
+        ):
+            updated = backfill_embeddings(batch_size=1)
+
+        self.assertEqual(updated, 1)
+        embed.assert_called_once_with(["User: Q\nJarvis: A"], "document")
+        self.assertEqual(cursor.executions[1][1], [([0.5, 0.5], "nomic-embed-text", 7)])
 
     def test_saves_turn_and_creates_session_if_needed(self) -> None:
         cursor = FakeCursor()
@@ -202,7 +269,7 @@ class DatabaseTests(unittest.TestCase):
         self.assertIn("INSERT INTO conversation_turns", cursor.executions[1][0])
         self.assertEqual(
             cursor.executions[1][1],
-            (TEST_SESSION_ID, "Question", "Answer"),
+            (TEST_SESSION_ID, "Question", "Answer", None, None),
         )
 
 

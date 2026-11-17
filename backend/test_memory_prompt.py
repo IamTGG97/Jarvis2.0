@@ -19,6 +19,10 @@ class MemoryPromptTests(unittest.TestCase):
         self.assertIn("You haven't mentioned that to me yet.", system)
         self.assertEqual(messages[1]["content"], "What is my dog called?")
 
+    def test_prompt_tells_model_to_acknowledge_new_facts(self) -> None:
+        system = build_chat_messages("My favorite color is green.", [])[0]["content"]
+        self.assertIn("When the user tells you something about themselves", system)
+
     def test_empty_history_is_explicit(self) -> None:
         system = build_chat_messages("Hi", [])[0]["content"]
         self.assertIn(NO_NOTES, system)

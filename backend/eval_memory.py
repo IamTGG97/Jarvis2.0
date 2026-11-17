@@ -51,6 +51,7 @@ class QuestionResult:
     context_tokens: int = 0
     decoy_leak: bool = False
     retrieval_ms: float = 0.0
+    embed_ms: float | None = None
     answer: str | None = None
     answer_correct: bool | None = None
     admitted_missing: bool = False
@@ -103,8 +104,12 @@ def score_answer(
     forbidden_terms: list[str],
 ) -> bool:
     """Keyword grading: positive answers must contain an expected term;
-    negative answers must admit ignorance and must not invent a known fact."""
+    negative answers must admit ignorance and must not invent a known fact;
+    statements (the user sharing a new fact) must not be answered with
+    "you haven't mentioned that"."""
     text = _normalize(answer)
+    if question["kind"] == "statement":
+        return not admits_missing(answer, negative_markers)
     if question["kind"] == "negative":
         admits = admits_missing(answer, negative_markers)
         invents = any(term in text for term in forbidden_terms)
@@ -113,7 +118,7 @@ def score_answer(
 
 
 def summarize(results: list[QuestionResult]) -> dict:
-    positives = [result for result in results if result.kind != "negative"]
+    positives = [r for r in results if r.kind in ("exact", "paraphrase")]
     summary: dict[str, object] = {"questions": len(results)}
 
     def rate(values: list[bool]) -> float | None:
@@ -147,13 +152,20 @@ def summarize(results: list[QuestionResult]) -> dict:
     negative_answers = [r.answer_correct for r in negatives if r.answer_correct is not None]
     if negative_answers:
         summary["negative_answer_accuracy"] = rate(negative_answers)
+    statement_answers = [
+        r.answer_correct for r in results
+        if r.kind == "statement" and r.answer_correct is not None
+    ]
+    if statement_answers:
+        summary["statement_ack_accuracy"] = rate(statement_answers)
 
     # When the needed turn is not in the context (never mentioned, or retrieval
     # missed it), the honest answer is "you haven't told me". Count how often the
     # model says so instead of guessing.
     unsupported = [
         r for r in results
-        if r.answer is not None and (r.kind == "negative" or not r.context_hit)
+        if r.answer is not None
+        and (r.kind == "negative" or (r.kind != "statement" and not r.context_hit))
     ]
     if unsupported:
         summary["unsupported_n"] = len(unsupported)
@@ -166,6 +178,9 @@ def summarize(results: list[QuestionResult]) -> dict:
     summary["avg_context_tokens"] = round(statistics.mean(r.context_tokens for r in results))
     summary["max_context_tokens"] = max(r.context_tokens for r in results)
     summary["avg_retrieval_ms"] = round(statistics.mean(r.retrieval_ms for r in results), 1)
+    embed_times = [r.embed_ms for r in results if r.embed_ms is not None]
+    if embed_times:
+        summary["avg_query_embed_ms"] = round(statistics.mean(embed_times), 1)
     answer_times = [r.answer_ms for r in results if r.answer_ms is not None]
     if answer_times:
         summary["avg_answer_ms"] = round(statistics.mean(answer_times))
@@ -203,15 +218,15 @@ def seed(database, fixtures: dict) -> None:
                 )
 
 
-def prepare_seeded_session(database) -> None:
-    """Hook for derived data (for example embeddings) after seeding."""
-    backfill = getattr(database, "backfill_embeddings", None)
-    if backfill is not None:
-        backfill(session_id=EVAL_SESSION_ID)
-        backfill(session_id=DECOY_SESSION_ID)
+def embed_seeded_turns(database) -> float:
+    """Embed the seeded turns through the real backfill path; returns seconds."""
+    started = time.perf_counter()
+    database.backfill_embeddings(session_id=EVAL_SESSION_ID)
+    database.backfill_embeddings(session_id=DECOY_SESSION_ID)
+    return time.perf_counter() - started
 
 
-def evaluate_retrieval(database, fixtures: dict) -> list[QuestionResult]:
+def evaluate_retrieval(database, fixtures: dict, mode: str = "keyword") -> list[QuestionResult]:
     transcripts_by_key = {turn["key"]: turn["transcript"] for turn in fixtures["turns"]}
     decoy_transcripts = {turn["transcript"] for turn in fixtures["decoy_session_turns"]}
     results = []
@@ -219,12 +234,23 @@ def evaluate_retrieval(database, fixtures: dict) -> list[QuestionResult]:
         result = QuestionResult(question["id"], question["kind"], question["question"])
         targets = {transcripts_by_key[key] for key in question["targets"]}
 
-        ranked = database.search_conversation_turns(
-            EVAL_SESSION_ID, question["question"], SEARCH_DEPTH
-        )
         started = time.perf_counter()
-        context = database.find_conversation_context(EVAL_SESSION_ID, question["question"])
+        vector_options: dict[str, object] = {}
+        if mode == "hybrid":
+            from embeddings import embed_text, embedding_model
+
+            vector_options = {
+                "query_embedding": embed_text(question["question"], "query"),
+                "embedding_model": embedding_model(),
+            }
+            result.embed_ms = (time.perf_counter() - started) * 1000
+        context = database.find_conversation_context(
+            EVAL_SESSION_ID, question["question"], **vector_options
+        )
         result.retrieval_ms = (time.perf_counter() - started) * 1000
+        ranked = database.search_conversation_turns(
+            EVAL_SESSION_ID, question["question"], SEARCH_DEPTH, **vector_options
+        )
 
         result.context_turns = len(context)
         result.context_tokens = context_token_estimate(context)
@@ -290,6 +316,12 @@ def main_cli(argv: list[str] | None = None) -> int:
     parser.add_argument("--e2e", action="store_true", help="also grade real Ollama answers")
     parser.add_argument("--only", help="comma-separated question ids to run")
     parser.add_argument("--json", type=Path, help="write per-question results and summary here")
+    parser.add_argument(
+        "--mode",
+        choices=("hybrid", "keyword"),
+        default="hybrid",
+        help="retrieval to evaluate (default: hybrid keyword + embeddings)",
+    )
     args = parser.parse_args(argv)
 
     load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -305,8 +337,10 @@ def main_cli(argv: list[str] | None = None) -> int:
     cleanup(database)
     try:
         seed(database, fixtures)
-        prepare_seeded_session(database)
-        results = evaluate_retrieval(database, fixtures)
+        backfill_seconds = None
+        if args.mode == "hybrid":
+            backfill_seconds = embed_seeded_turns(database)
+        results = evaluate_retrieval(database, fixtures, args.mode)
         if args.e2e:
             print("End-to-end answers through Ollama:")
             evaluate_answers(fixtures, results)
@@ -321,6 +355,11 @@ def main_cli(argv: list[str] | None = None) -> int:
             )
 
     summary = summarize(results)
+    summary["mode"] = args.mode
+    if backfill_seconds is not None:
+        seeded = len(fixtures["turns"]) + len(fixtures["decoy_session_turns"])
+        summary["backfill_seconds"] = round(backfill_seconds, 2)
+        summary["backfill_turns"] = seeded
     print_report(results, summary)
     if args.json:
         payload = {
