@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
 from database import find_conversation_context, initialize_database, save_conversation_turn
+from memory_prompt import build_chat_messages
 
 load_dotenv()
 
@@ -108,36 +109,21 @@ async def transcribe(file: UploadFile = File(...)) -> dict[str, str]:
     return {"transcript": transcript}
 
 
+def _ollama_chat_options() -> dict[str, float | int]:
+    options: dict[str, float | int] = {"num_ctx": 2048, "num_predict": 160}
+    temperature = os.getenv("OLLAMA_TEMPERATURE", "").strip()
+    if temperature:
+        options["temperature"] = float(temperature)
+    return options
+
+
 async def _generate_response(
     transcript: str,
     conversation_context: list[dict[str, str]],
 ) -> str:
     base_url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
     model = os.getenv("OLLAMA_MODEL", "qwen2.5:1.5b")
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "You are Jarvis, a concise and helpful assistant. Earlier user and "
-                "assistant messages in this request are retrieved conversation history. "
-                "Use them as the source of truth when answering questions about what "
-                "the user previously said. If the history contains a personal fact, "
-                "answer it directly and naturally, for example: 'You told me your "
-                "favorite team is the Chicago Bulls.' Do not claim you lack access to "
-                "personal preferences when the answer is present in the history. If "
-                "the history does not contain the requested information, say it was "
-                "not mentioned rather than inventing a memory."
-            ),
-        }
-    ]
-    for turn in conversation_context:
-        messages.extend(
-            [
-                {"role": "user", "content": turn["transcript"]},
-                {"role": "assistant", "content": turn["response"]},
-            ]
-        )
-    messages.append({"role": "user", "content": transcript})
+    messages = build_chat_messages(transcript, conversation_context)
 
     try:
         async with httpx.AsyncClient(timeout=120) as client:
@@ -147,8 +133,8 @@ async def _generate_response(
                     "model": model,
                     "stream": False,
                     "messages": messages,
-                    "options": {"num_ctx": 2048, "num_predict": 160},
-                    "keep_alive": "0",
+                    "options": _ollama_chat_options(),
+                    "keep_alive": os.getenv("OLLAMA_KEEP_ALIVE", "0"),
                 },
             )
             result.raise_for_status()

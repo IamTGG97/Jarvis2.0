@@ -53,6 +53,7 @@ class QuestionResult:
     retrieval_ms: float = 0.0
     answer: str | None = None
     answer_correct: bool | None = None
+    admitted_missing: bool = False
     answer_ms: float | None = None
     notes: list[str] = field(default_factory=list)
     context: list[dict[str, str]] = field(default_factory=list, repr=False)
@@ -86,6 +87,15 @@ def rank_of_target(
     return None
 
 
+def _normalize(text: str) -> str:
+    return text.lower().replace("\N{RIGHT SINGLE QUOTATION MARK}", "'")
+
+
+def admits_missing(answer: str, negative_markers: list[str]) -> bool:
+    text = _normalize(answer)
+    return any(marker in text for marker in negative_markers)
+
+
 def score_answer(
     answer: str,
     question: dict,
@@ -94,9 +104,9 @@ def score_answer(
 ) -> bool:
     """Keyword grading: positive answers must contain an expected term;
     negative answers must admit ignorance and must not invent a known fact."""
-    text = answer.lower().replace("â€™", "'")
+    text = _normalize(answer)
     if question["kind"] == "negative":
-        admits = any(marker in text for marker in negative_markers)
+        admits = admits_missing(answer, negative_markers)
         invents = any(term in text for term in forbidden_terms)
         return admits and not invents
     return any(term in text for term in question["expect_any"])
@@ -137,6 +147,19 @@ def summarize(results: list[QuestionResult]) -> dict:
     negative_answers = [r.answer_correct for r in negatives if r.answer_correct is not None]
     if negative_answers:
         summary["negative_answer_accuracy"] = rate(negative_answers)
+
+    # When the needed turn is not in the context (never mentioned, or retrieval
+    # missed it), the honest answer is "you haven't told me". Count how often the
+    # model says so instead of guessing.
+    unsupported = [
+        r for r in results
+        if r.answer is not None and (r.kind == "negative" or not r.context_hit)
+    ]
+    if unsupported:
+        summary["unsupported_n"] = len(unsupported)
+        summary["unsupported_admit_rate"] = rate(
+            [r.admitted_missing for r in unsupported]
+        )
 
     summary["decoy_leaks"] = sum(r.decoy_leak for r in results)
     summary["avg_context_turns"] = round(statistics.mean(r.context_turns for r in results), 2)
@@ -238,6 +261,7 @@ def evaluate_answers(fixtures: dict, results: list[QuestionResult]) -> None:
         finally:
             result.answer_ms = (time.perf_counter() - started) * 1000
         result.answer = answer
+        result.admitted_missing = admits_missing(answer, markers)
         result.answer_correct = score_answer(
             answer, question, markers, forbidden.get(result.id, [])
         )
@@ -287,7 +311,14 @@ def main_cli(argv: list[str] | None = None) -> int:
             print("End-to-end answers through Ollama:")
             evaluate_answers(fixtures, results)
     finally:
-        cleanup(database)
+        try:
+            cleanup(database)
+        except Exception as error:  # report, but keep the measured results
+            print(
+                f"WARNING: could not delete eval rows ({error}). Re-run the eval "
+                "to clean up; it deletes leftovers before seeding.",
+                file=sys.stderr,
+            )
 
     summary = summarize(results)
     print_report(results, summary)

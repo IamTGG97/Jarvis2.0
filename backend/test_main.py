@@ -8,7 +8,7 @@ from uuid import UUID
 import httpx
 from fastapi import HTTPException, UploadFile
 
-from main import RespondRequest, app, respond, transcribe
+from main import RespondRequest, _ollama_chat_options, app, respond, transcribe
 
 TEST_SESSION_ID = UUID("fdde5172-0d09-4eb6-8502-ad4a65448b19")
 
@@ -87,19 +87,13 @@ class SpeechApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, {"response": "Hello there."})
         self.assertEqual(request_data["url"], "http://localhost:11434/api/chat")
         self.assertIn(b'"model":"qwen2.5:1.5b"', request_data["body"])
+        self.assertEqual(json.loads(request_data["body"])["keep_alive"], "0")
         messages = json.loads(request_data["body"])["messages"]
-        self.assertIn(
-            "answer it directly and naturally",
-            messages[0]["content"],
-        )
-        self.assertIn(
-            "Do not claim you lack access to personal preferences",
-            messages[0]["content"],
-        )
-        self.assertIn(
-            {"role": "user", "content": "My name is George."},
-            messages,
-        )
+        self.assertEqual(len(messages), 2)
+        self.assertEqual(messages[0]["role"], "system")
+        self.assertIn("User: My name is George.", messages[0]["content"])
+        self.assertIn("Jarvis: Nice to meet you, George.", messages[0]["content"])
+        self.assertIn("Never guess or invent personal details", messages[0]["content"])
         self.assertEqual(messages[-1], {"role": "user", "content": "What is my name?"})
         find_context.assert_called_once_with(TEST_SESSION_ID, "What is my name?")
         save_turn.assert_called_once_with(
@@ -107,6 +101,12 @@ class SpeechApiTests(unittest.IsolatedAsyncioTestCase):
             "What is my name?",
             "Hello there.",
         )
+
+    def test_ollama_options_default_and_override(self) -> None:
+        with patch.dict(os.environ, {"OLLAMA_TEMPERATURE": ""}):
+            self.assertEqual(_ollama_chat_options(), {"num_ctx": 2048, "num_predict": 160})
+        with patch.dict(os.environ, {"OLLAMA_TEMPERATURE": "0.2"}):
+            self.assertEqual(_ollama_chat_options()["temperature"], 0.2)
 
     async def test_reports_ollama_not_running(self) -> None:
         with (
