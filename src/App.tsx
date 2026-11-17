@@ -1,7 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
+import DetectionOverlay from './DetectionOverlay'
 import SessionMenu from './SessionMenu'
+import {
+  canvasToJpeg,
+  detectFrame,
+  DetectionRequestError,
+  type DetectionResult,
+  type VisionState,
+} from './detection'
 import { fetchSessionTurns, SESSION_STORAGE_KEY } from './sessionsApi'
+
+// The captured still, kept in memory only (never stored or saved). Phase 4 can
+// send this same JPEG to a vision-language model instead of re-capturing.
+type CapturedFrame = { frameId: number; blob: Blob; width: number; height: number; capturedAt: number }
 
 function App() {
   const [sessionId, setSessionId] = useState(() => {
@@ -29,10 +41,55 @@ function App() {
   const [speechMessage, setSpeechMessage] = useState('')
   const [transcript, setTranscript] = useState('')
   const [response, setResponse] = useState('')
-  const [capturedFrame, setCapturedFrame] = useState('')
   const [capturedResolution, setCapturedResolution] = useState('')
   const [memoryWarning, setMemoryWarning] = useState('')
   const sessionSwitchRef = useRef(0)
+  // Object detection for the frame captured when the mic is pressed.
+  const [vision, setVision] = useState<VisionState>({ status: 'idle' })
+  const frameIdRef = useRef(0)
+  const capturedFrameRef = useRef<CapturedFrame | null>(null)
+  // Never rejects: resolves to the frame's detections, or null on failure or
+  // when a newer frame superseded it. Phase 4: await this before /api/respond.
+  const frameDetectionRef = useRef<{ frameId: number; promise: Promise<DetectionResult | null> } | null>(null)
+  // The backend runs one detection at a time, so requests are chained.
+  const detectChainRef = useRef<Promise<unknown>>(Promise.resolve())
+
+  function startFrameDetection(canvas: HTMLCanvasElement) {
+    const frameId = ++frameIdRef.current
+    const startedAt = performance.now()
+    const capturedAt = Date.now()
+    const { width, height } = canvas
+    setVision({ status: 'detecting', frameId })
+
+    // toBlob copies the canvas now and encodes off the main thread, so the
+    // microphone starts without waiting for the JPEG or the upload.
+    const outcome = canvasToJpeg(canvas).then((blob) => {
+      capturedFrameRef.current = { frameId, blob, width, height, capturedAt }
+      const run = detectChainRef.current.then(() => (
+        // Skip frames that a newer capture replaced while they were queued.
+        frameId === frameIdRef.current ? detectFrame(blob) : null
+      ))
+      detectChainRef.current = run.catch(() => undefined)
+      return run
+    })
+
+    const promise = outcome.then((result) => {
+      if (result && frameId === frameIdRef.current) {
+        setVision({ status: 'ready', frameId, capturedAt, result, elapsedMs: performance.now() - startedAt })
+      }
+      return result
+    }, (error: unknown) => {
+      const failure = error instanceof DetectionRequestError
+        ? error
+        : new DetectionRequestError('Detection failed', error instanceof Error ? error.message : String(error))
+      console.warn('Object detection failed:', failure.detail)
+      if (frameId === frameIdRef.current) {
+        setVision({ status: 'error', frameId, message: failure.message, detail: failure.detail })
+      }
+      return null
+    })
+    frameDetectionRef.current = { frameId, promise }
+  }
 
   async function switchSession(nextSessionId: string) {
     const switchId = ++sessionSwitchRef.current
@@ -184,8 +241,9 @@ function App() {
     canvas.width = Math.round(video.videoWidth * scale)
     canvas.height = Math.round(video.videoHeight * scale)
     context.drawImage(video, 0, 0, canvas.width, canvas.height)
-    setCapturedFrame(canvas.toDataURL('image/jpeg', 0.9))
     setCapturedResolution(`${canvas.width} × ${canvas.height}`)
+    // Runs in parallel with listening; a detection failure only shows a note.
+    startFrameDetection(canvas)
 
     try {
       microphoneStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
@@ -254,6 +312,7 @@ function App() {
           onLoadedMetadata={() => setIsVideoReady(true)}
           aria-label="Live camera preview"
         />
+        {cameraStatus === 'active' && <DetectionOverlay vision={vision} mirrored />}
         {cameraStatus !== 'active' && (
           <div className="camera-placeholder" role="status">
             <strong>{cameraStatus === 'requesting' ? 'Camera access' : 'Camera unavailable'}</strong>
@@ -296,7 +355,7 @@ function App() {
           onClick={() => void toggleMicrophone()}
           disabled={cameraStatus !== 'active' || !isVideoReady || speechState === 'transcribing'}
           aria-label={speechState === 'listening' ? 'Stop listening' : speechState === 'transcribing' ? 'Transcribing speech' : speechState === 'thinking' ? 'Generating response' : 'Start listening'}
-          aria-description={capturedFrame ? 'A still frame has been captured locally.' : undefined}
+          aria-description={capturedResolution ? 'A still frame was captured and checked for objects locally.' : undefined}
           aria-pressed={speechState === 'listening'}
           title={`${speechState === 'listening' ? 'Stop listening' : 'Start listening'}${capturedResolution ? ` · captured ${capturedResolution} frame` : ''}`}
         >

@@ -357,6 +357,89 @@
 .session-error { margin: 0; color: #ffb19e; }
 .session-empty { margin: 0; padding: 4px 9px; color: #ffffff8c; }
 
+/* Object detection: boxes over the mirrored, object-fit: cover video. Painted
+   before (under) the LED, voice feedback, mic button, and conversation menu. */
+.detection-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.detection-box {
+  position: absolute;
+  border: 2px solid #b3d5b7e6;
+  border-radius: 6px;
+  box-shadow: 0 0 0 1px #0004;
+  animation: detection-in 160ms ease-out;
+}
+
+.detection-box.is-person { border-color: #ffb19ee6; }
+
+.detection-box span {
+  position: absolute;
+  bottom: 100%;
+  left: -2px;
+  max-width: max(100%, 120px);
+  margin-bottom: 3px;
+  padding: 1px 6px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: #151a16c2;
+  color: #f7f6f0;
+  font-size: 11px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detection-box span.is-inside { top: 2px; bottom: auto; left: 2px; margin: 0; }
+.detection-box span.is-right { right: -2px; left: auto; }
+.detection-box span.is-inside.is-right { right: 2px; }
+
+.vision-summary {
+  position: absolute;
+  top: max(20px, env(safe-area-inset-top));
+  left: 50%;
+  display: flex;
+  max-width: calc(100vw - 140px);
+  padding: 5px 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 9px;
+  transform: translateX(-50%);
+  border: 1px solid #ffffff35;
+  border-radius: 15px;
+  background: #151a16a6;
+  color: #f7f6f0;
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: center;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.vision-summary.is-detecting { color: #d0d5cf; }
+.vision-summary.is-error { color: #ffd59a; }
+.vision-seen { overflow-wrap: anywhere; }
+
+.vision-person {
+  padding: 0 7px;
+  border-radius: 9px;
+  background: #ffffff1c;
+  color: #d0d5cf;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.vision-person.is-present { background: #ff765b38; color: #ffd6cb; }
+
+@keyframes detection-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 .capture-canvas, .sr-only {
   position: absolute;
   width: 1px;
@@ -372,6 +455,12 @@
   .microphone-button { width: 62px; height: 62px; }
 }
 
+@media (max-width: 600px) {
+  .vision-summary { max-width: calc(100vw - 128px); font-size: 11px; }
+  .detection-box span { font-size: 10px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .microphone-button { transition: none; }
+  .detection-box { animation: none; }
 }
