@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
-import DetectionOverlay from './DetectionOverlay'
+import DetectionOverlay, { type AnswerHighlight } from './DetectionOverlay'
 import SessionMenu from './SessionMenu'
 import {
   canvasToJpeg,
@@ -10,6 +10,15 @@ import {
   type VisionState,
 } from './detection'
 import { fetchSessionTurns, SESSION_STORAGE_KEY } from './sessionsApi'
+import {
+  askVision,
+  buildVisionForm,
+  previewUsesVisionModel,
+  RespondError,
+  routeTag,
+  waitingMessage,
+  type RouteTag,
+} from './visionRespond'
 
 // The captured still, kept in memory only (never stored or saved). Phase 4 can
 // send this same JPEG to a vision-language model instead of re-capturing.
@@ -43,6 +52,18 @@ function App() {
   const [response, setResponse] = useState('')
   const [capturedResolution, setCapturedResolution] = useState('')
   const [memoryWarning, setMemoryWarning] = useState('')
+  // Where the last answer came from ("Looked at camera", "From memory", ...).
+  const [answerTag, setAnswerTag] = useState<RouteTag | null>(null)
+  const [visionWarning, setVisionWarning] = useState('')
+  const [answerHighlight, setAnswerHighlight] = useState<AnswerHighlight | null>(null)
+  // Waiting for /api/respond/vision: start time (for the "Looking closely" timer)
+  // and whether a frame was sent. The ticker re-renders once a second.
+  const [waiting, setWaiting] = useState<{
+    id: number; startedAt: number; hasFrame: boolean; usesVisionModel: boolean | null
+  } | null>(null)
+  const [now, setNow] = useState(() => Date.now())
+  const respondAbortRef = useRef<AbortController | null>(null)
+  const answerCountRef = useRef(0)
   const sessionSwitchRef = useRef(0)
   // Object detection for the frame captured when the mic is pressed.
   const [vision, setVision] = useState<VisionState>({ status: 'idle' })
@@ -98,6 +119,7 @@ function App() {
     setTranscript('')
     setResponse('')
     setMemoryWarning('')
+    clearAnswerDetails()
     setSpeechMessage('')
     try {
       const turns = await fetchSessionTurns(nextSessionId)
@@ -114,6 +136,26 @@ function App() {
       setSpeechMessage(error instanceof Error ? error.message : 'Could not load the conversation.')
     }
   }
+
+  function clearAnswerDetails() {
+    setAnswerTag(null)
+    setVisionWarning('')
+    setAnswerHighlight(null)
+  }
+
+  function stopWaiting() {
+    // Client side only: the backend may still finish (and save the turn).
+    respondAbortRef.current?.abort()
+  }
+
+  useEffect(() => {
+    if (!waiting) return
+    setNow(Date.now())
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [waiting])
+
+  useEffect(() => () => respondAbortRef.current?.abort(), [])
 
   const finishUtterance = () => {
     if (!isRecordingRef.current) return
@@ -154,21 +196,54 @@ function App() {
 
       setTranscript(words)
       setResponse('')
+      clearAnswerDetails()
       setSpeechState('thinking')
-      setSpeechMessage('Thinking')
+      setSpeechMessage('')
 
-      const answerResponse = await fetch('/api/respond', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript: words, session_id: sessionId }),
+      // The frame and detections captured when the mic was pressed. The
+      // detection promise never rejects (null on failure) and is almost always
+      // done by now, because transcription takes longer than detection.
+      const pending = frameDetectionRef.current
+      const detection = pending ? await pending.promise : null
+      const captured = capturedFrameRef.current
+      const frame = pending && captured && captured.frameId === pending.frameId ? captured : null
+
+      const answerId = ++answerCountRef.current
+      const controller = new AbortController()
+      respondAbortRef.current = controller
+      setWaiting({ id: answerId, startedAt: Date.now(), hasFrame: Boolean(frame), usesVisionModel: null })
+      // Runs beside the real request (no model, ~1 ms) so the status can say
+      // "looking closely" only when the slow vision model is really used.
+      void previewUsesVisionModel(words, detection, Boolean(frame)).then((usesVisionModel) => {
+        setWaiting((current) => (current && current.id === answerId ? { ...current, usesVisionModel } : current))
       })
-      const answer = await answerResponse.json() as { response?: string; detail?: string; memory_warning?: string | null }
-      if (!answerResponse.ok) throw new Error(answer.detail || 'Local AI response failed.')
-      setResponse(answer.response?.trim() || '')
+      let answer
+      try {
+        answer = await askVision(
+          buildVisionForm(words, sessionId, detection, frame?.blob ?? null),
+          { signal: controller.signal },
+        )
+      } finally {
+        if (respondAbortRef.current === controller) respondAbortRef.current = null
+        setWaiting(null)
+      }
+      if (answerId !== answerCountRef.current) return
+      setResponse(answer.response.trim())
       setMemoryWarning(answer.memory_warning || '')
+      setVisionWarning(answer.vision_warning || '')
+      setAnswerTag(routeTag(answer))
+      const frameWidth = detection?.image_width ?? frame?.width ?? 0
+      const frameHeight = detection?.image_height ?? frame?.height ?? 0
+      setAnswerHighlight(answer.used_vision && answer.objects_referenced.length && frameWidth && frameHeight
+        ? { id: answerId, frameWidth, frameHeight, objects: answer.objects_referenced }
+        : null)
       setSpeechMessage('')
     } catch (error) {
-      setSpeechMessage(error instanceof Error ? error.message : 'Local speech service unavailable.')
+      if (error instanceof RespondError && error.kind === 'cancelled') {
+        setSpeechMessage('Stopped waiting. Jarvis may still finish in the background, so the next camera question can be slow.')
+      } else {
+        setSpeechMessage(error instanceof Error ? error.message : 'Local speech service unavailable.')
+      }
     } finally {
       setSpeechState('idle')
     }
@@ -255,6 +330,7 @@ function App() {
       setTranscript('')
       setResponse('')
       setMemoryWarning('')
+      clearAnswerDetails()
       setSpeechMessage('Listening')
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) audioChunksRef.current.push(event.data)
@@ -301,6 +377,8 @@ function App() {
     }
   }
 
+  const waitStatus = waiting ? waitingMessage(now - waiting.startedAt, waiting.hasFrame, waiting.usesVisionModel) : null
+
   return (
     <main className="app-shell">
       <section className="camera-scene" aria-label="Jarvis camera view">
@@ -312,7 +390,7 @@ function App() {
           onLoadedMetadata={() => setIsVideoReady(true)}
           aria-label="Live camera preview"
         />
-        {cameraStatus === 'active' && <DetectionOverlay vision={vision} mirrored />}
+        {cameraStatus === 'active' && <DetectionOverlay vision={vision} highlight={answerHighlight} mirrored />}
         {cameraStatus !== 'active' && (
           <div className="camera-placeholder" role="status">
             <strong>{cameraStatus === 'requesting' ? 'Camera access' : 'Camera unavailable'}</strong>
@@ -330,7 +408,7 @@ function App() {
           onSelectSession={(nextSessionId) => void switchSession(nextSessionId)}
         />
 
-        {(transcript || response || speechMessage || memoryWarning) && (
+        {(transcript || response || speechMessage || memoryWarning || waitStatus) && (
           <div className="voice-feedback" aria-live="polite" role="status">
             {transcript && (
               <p className="voice-turn">
@@ -344,7 +422,26 @@ function App() {
                 {response}
               </p>
             )}
-            {memoryWarning && <p className="voice-status voice-warning">{memoryWarning}</p>}
+            {response && answerTag && (
+              <p className="answer-meta">
+                <span className={`route-tag is-${answerTag.tone}`} title={answerTag.title}>{answerTag.text}</span>
+              </p>
+            )}
+            {waitStatus && (
+              <div className={`answer-waiting${waitStatus.closeLook ? ' is-slow' : ''}`}>
+                <i aria-hidden="true" />
+                {/* The timer ticks every second; screen readers get one stable sentence. */}
+                <span aria-hidden="true">{waitStatus.text}</span>
+                <span className="sr-only">
+                  {waitStatus.closeLook ? 'Looking closely at the camera. This can take a few minutes.' : 'Thinking'}
+                </span>
+                {waitStatus.canStop && (
+                  <button type="button" onClick={stopWaiting}>Stop waiting</button>
+                )}
+              </div>
+            )}
+            {visionWarning && <p className="voice-status voice-warning voice-warning-small" title={visionWarning}>Camera: {visionWarning}</p>}
+            {memoryWarning && <p className="voice-status voice-warning voice-warning-small">{memoryWarning}</p>}
             {speechMessage && <p className="voice-status">{speechMessage}</p>}
           </div>
         )}

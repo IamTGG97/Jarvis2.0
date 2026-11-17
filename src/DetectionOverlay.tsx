@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { projectBox, summarizeLabels, type VisionState } from './detection'
+import type { ReferencedObject } from './visionRespond'
+
+// Objects the last answer referred to, highlighted over the camera view.
+export type AnswerHighlight = { id: number; frameWidth: number; frameHeight: number; objects: ReferencedObject[] }
+
+const HIGHLIGHT_VISIBLE_MS = 15_000
+// The backend only treats detections at 0.5 or higher as "seen"; weaker
+// references are drawn dashed with a "?" (the answer hedges them too).
+const UNCERTAIN_BELOW = 0.5
 
 const MAX_DRAWN_BOXES = 15
 // Boxes describe the moment the frame was captured; the live video moves on,
@@ -12,13 +21,30 @@ const LABEL_ROOM = 120
 
 type DetectionOverlayProps = {
   vision: VisionState
+  highlight?: AnswerHighlight | null
   mirrored: boolean
 }
 
-function DetectionOverlay({ vision, mirrored }: DetectionOverlayProps) {
+function DetectionOverlay({ vision, highlight = null, mirrored }: DetectionOverlayProps) {
   const layerRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
   const [hiddenFrameId, setHiddenFrameId] = useState<number | null>(null)
+  const [hiddenHighlightId, setHiddenHighlightId] = useState<number | null>(null)
+
+  const highlightId = highlight?.id ?? null
+  useEffect(() => {
+    if (highlightId === null) return
+    const timer = window.setTimeout(() => setHiddenHighlightId(highlightId), HIGHLIGHT_VISIBLE_MS)
+    return () => window.clearTimeout(timer)
+  }, [highlightId])
+  const activeHighlight = highlight && hiddenHighlightId !== highlight.id ? highlight : null
+  // Boxes are relative to the unmirrored frame; projectBox mirrors them.
+  const highlighted = activeHighlight
+    ? activeHighlight.objects.slice(0, MAX_DRAWN_BOXES).flatMap((object, index) => {
+      const view = projectBox(object.box, activeHighlight.frameWidth, activeHighlight.frameHeight, size.width, size.height, mirrored)
+      return view ? [{ object, view, key: `answer-${activeHighlight.id}-${index}` }] : []
+    })
+    : []
 
   useEffect(() => {
     const layer = layerRef.current
@@ -58,7 +84,26 @@ function DetectionOverlay({ vision, mirrored }: DetectionOverlayProps) {
 
   return (
     <>
-      <div ref={layerRef} className="detection-layer" aria-hidden="true">
+      <div ref={layerRef} className={`detection-layer${highlighted.length ? ' has-highlight' : ''}`} aria-hidden="true">
+        {highlighted.map(({ object, view, key }) => (
+          <div
+            key={key}
+            className={`detection-box is-referenced${object.confidence < UNCERTAIN_BELOW ? ' is-uncertain' : ''}`}
+            style={{ left: view.left, top: view.top, width: view.width, height: view.height }}
+          >
+            <span
+              className={[
+                view.top < TOP_CONTROLS_BAND ? 'is-inside' : '',
+                view.left + LABEL_ROOM > size.width ? 'is-right' : '',
+              ].join(' ').trim() || undefined}
+              style={view.top < TOP_CONTROLS_BAND
+                ? { top: Math.max(2, Math.min(TOP_CONTROLS_BAND - view.top, view.height - 20)) }
+                : undefined}
+            >
+              {object.confidence < UNCERTAIN_BELOW ? `${object.label}?` : object.label}
+            </span>
+          </div>
+        ))}
         {boxes.map(({ detection, view, key }) => (
           <div
             key={key}

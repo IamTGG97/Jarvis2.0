@@ -6,6 +6,6 @@
     "outDir": ".test-build",
     "jsx": "react-jsx"
   },
-  "include": ["src/detection.ts", "src/detection.test.ts"],
+  "include": ["src/detection.ts", "src/detection.test.ts", "src/visionRespond.ts", "src/visionRespond.test.ts"],
   "references": []
 }

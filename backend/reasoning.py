@@ -765,6 +765,19 @@ def vlm_failure_answer(
     )
 
 
+def expected_route(
+    question: str, has_image: bool, detections: list[Detection] | None
+) -> tuple[RouteDecision, bool]:
+    """The route ``/api/respond/vision`` will take, plus whether it will call
+    the (slow) vision-language model. Pure and about a millisecond, so the UI
+    can ask first and only say "looking closely" when that is true."""
+    decision = route_question(question, has_image, detections)
+    uses_vlm = decision.route == "vlm"
+    if decision.route == "detections" and has_image:
+        uses_vlm = answer_from_detections(decision, detections or []).escalate
+    return decision, uses_vlm
+
+
 def honest_no_vision(decision: RouteDecision) -> Answer:
     if decision.unknown_target:
         text = (

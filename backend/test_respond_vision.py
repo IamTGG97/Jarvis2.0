@@ -305,5 +305,44 @@ class RespondTextCompatibilityTests(unittest.TestCase):
         self.assertIsNone(m.chat.call_args.args[2])
 
 
+class RoutePreviewTests(unittest.TestCase):
+    def preview(self, body):
+        with Mocks() as m:
+            response = TestClient(main.app).post("/api/respond/route", json=body)
+        m.vlm.assert_not_called()
+        m.chat.assert_not_called()
+        m.save.assert_not_called()
+        m.retrieve.assert_not_called()
+        return response
+
+    def test_preview_routes_without_running_anything(self):
+        cases = [
+            ({"transcript": "Where is the bottle?", "has_image": True, "detections": SCENE},
+             "detections", False),
+            ({"transcript": "What color is the bottle?", "has_image": True, "detections": SCENE},
+             "vlm", True),
+            # Only a weak cup: the detection route escalates to the VLM when a frame exists.
+            ({"transcript": "Is there a cup here?", "has_image": True, "detections": SCENE},
+             "vlm", True),
+            ({"transcript": "Is there a cup here?", "has_image": False, "detections": SCENE},
+             "detections", False),
+            ({"transcript": "What is the capital of France?", "has_image": True, "detections": SCENE},
+             "text", False),
+            ({"transcript": "What do you see?"}, "no_vision", False),
+        ]
+        for body, route, uses_vlm in cases:
+            with self.subTest(question=body["transcript"], has_image=body.get("has_image")):
+                response = self.preview(body)
+                self.assertEqual(response.status_code, 200, response.text)
+                self.assertEqual(response.json()["route"], route)
+                self.assertEqual(response.json()["uses_vision_model"], uses_vlm)
+
+    def test_preview_validation(self):
+        self.assertEqual(self.preview({"transcript": " "}).status_code, 400)
+        self.assertEqual(self.preview({"transcript": "a" * 4001}).status_code, 413)
+        self.assertEqual(self.preview({"transcript": "hi", "detections": [{"label": "x"}]}).status_code, 422)
+        self.assertEqual(self.preview({"has_image": True}).status_code, 422)
+
+
 if __name__ == "__main__":
     unittest.main()

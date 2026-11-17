@@ -358,6 +358,40 @@ async def respond(request: RespondRequest) -> dict[str, str | None]:
     return {"response": answer.response, "memory_warning": memory_warning}
 
 
+class RoutePreviewRequest(BaseModel):
+    transcript: str
+    has_image: bool = False
+    detections: dict | list | None = None
+
+
+@app.post("/api/respond/route")
+async def respond_route(request: RoutePreviewRequest) -> dict:
+    """Which route ``/api/respond/vision`` will take for this question, without
+    answering it. No model runs and nothing is saved. The UI calls this next
+    to the real request so it can say "looking closely" (minutes on this
+    laptop) only when the vision model will really be used.
+
+    Returns ``{"route", "uses_vision_model", "reason"}``.
+    """
+    transcript = request.transcript.strip()
+    if not transcript:
+        raise HTTPException(status_code=400, detail="Transcript is required.")
+    if len(transcript) > MAX_TRANSCRIPT_CHARS:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Transcript must be {MAX_TRANSCRIPT_CHARS} characters or fewer.",
+        )
+    detections = None
+    if request.detections is not None:
+        try:
+            detections = reasoning.parse_detections(request.detections)
+        except ValueError as error:
+            raise _validation_error("detections", f"Invalid detections: {error}") from None
+    decision, uses_vlm = reasoning.expected_route(transcript, request.has_image, detections)
+    route = "vlm" if uses_vlm else decision.route
+    return {"route": route, "uses_vision_model": uses_vlm, "reason": decision.reason}
+
+
 VISION_RESPOND_BODY = {
     "requestBody": {
         "required": True,
