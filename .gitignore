@@ -27,3 +27,6 @@ __pycache__/
 *.njsproj
 *.sln
 *.sw?
+
+# Local model weights (downloaded by scripts, verified by SHA-256)
+backend/models/
