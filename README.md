@@ -114,7 +114,7 @@ fallback, install `qwen2.5:0.5b` and set `OLLAMA_MODEL=qwen2.5:0.5b`. See
   answers, `--mode keyword` to compare against keyword-only search). It deletes
   its test rows when done.
 
-### Object detection (backend only so far)
+### Object detection
 
 `POST /api/detect` accepts one JPEG or PNG image (multipart field `file`, up to
 5 MB) and returns COCO object labels, confidences, and boxes normalized to 0-1,
@@ -129,7 +129,21 @@ curl.exe -F "file=@backend/test_data/office_public_domain.jpg;type=image/jpeg" h
 .\.venv\Scripts\python.exe backend\bench_vision.py
 ```
 
-The camera frame is not yet sent to this endpoint by the frontend.
+When you press the microphone button, the app captures one camera frame and
+sends it (as a JPEG, in memory) to `/api/detect` while it is already listening.
+Boxes and labels are drawn over the camera view for a few seconds, and a small
+"Seen: ..." summary with a person indicator appears at the top. If detection
+fails, a short note appears there instead and the voice flow carries on.
+Jarvis does not use these detections in its answers yet (Phase 4). If you ask
+what it sees, the answer is not based on the camera and may be made up.
+
+Frontend helper tests (box math for the mirrored `object-fit: cover` video,
+summary text, API errors) run without extra packages:
+
+```powershell
+$env:OPENSSL_CONF = ''
+npm run test:frontend
+```
 
 Run backend tests with:
 
