@@ -48,6 +48,14 @@ Audio and transcript requests stay on this computer; no paid API key is used.
    That one-time download requires an internet connection; subsequent
    transcription runs locally.
 
+5. Download the object detection model (YOLOX-Tiny, Apache-2.0, about 20 MB).
+   The script verifies the SHA-256 checksum and saves it to the git-ignored
+   `backend\models\` folder:
+
+   ```powershell
+   .\.venv\Scripts\python.exe backend\download_vision_model.py
+   ```
+
 No paid API key is required. The first transcription downloads the `tiny.en`
 speech model automatically; that one-time download requires an internet
 connection.
@@ -105,6 +113,23 @@ fallback, install `qwen2.5:0.5b` and set `OLLAMA_MODEL=qwen2.5:0.5b`. See
   recall on a seeded test conversation (add `--e2e` to also grade real Ollama
   answers, `--mode keyword` to compare against keyword-only search). It deletes
   its test rows when done.
+
+### Object detection (backend only so far)
+
+`POST /api/detect` accepts one JPEG or PNG image (multipart field `file`, up to
+5 MB) and returns COCO object labels, confidences, and boxes normalized to 0-1,
+plus `person_present`. It runs locally with YOLOX-Tiny on `onnxruntime`, about
+0.15 s per image on a 2-core laptop. Person detection is presence-only (no face
+recognition), and images are decoded in memory and never saved. Settings:
+`VISION_MODEL` (`yolox_tiny` or the lighter `yolox_nano`), `VISION_CONFIDENCE`,
+`VISION_THREADS`, `VISION_KEEP_LOADED`. Try it with the backend running:
+
+```powershell
+curl.exe -F "file=@backend/test_data/office_public_domain.jpg;type=image/jpeg" http://127.0.0.1:8000/api/detect
+.\.venv\Scripts\python.exe backend\bench_vision.py
+```
+
+The camera frame is not yet sent to this endpoint by the frontend.
 
 Run backend tests with:
 
