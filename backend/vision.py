@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 MODELS_DIR = Path(__file__).resolve().parent / "models"
 
@@ -61,7 +61,8 @@ NMS_IOU = 0.45
 MAX_DETECTIONS = 50
 # Reject huge images before decoding pixels (decompression-bomb guard).
 MAX_IMAGE_PIXELS = 40_000_000
-ALLOWED_FORMATS = {"JPEG", "PNG"}
+# Pillow reports multi-picture JPEGs (many phone cameras) as "MPO"; they are JPEGs.
+ALLOWED_FORMATS = {"JPEG", "MPO", "PNG"}
 
 
 class ImageValidationError(ValueError):
@@ -176,13 +177,22 @@ def missing_weights_message(name: str) -> str:
 
 
 def decode_image(data: bytes) -> Image.Image:
-    """Decode JPEG/PNG bytes in memory into an RGB image. Nothing touches disk."""
+    """Decode JPEG/PNG bytes in memory into an upright RGB image. Nothing touches disk.
+
+    EXIF orientation is applied, so boxes are relative to the image as viewers
+    display it (phone photos often store pixels sideways plus a rotate tag).
+    """
     if not data:
         raise ImageValidationError("The uploaded image is empty.")
     try:
         image = Image.open(io.BytesIO(data))
         image_format = image.format
         width, height = image.size
+    except Image.DecompressionBombError as error:
+        # Pillow refuses absurd dimensions while reading the header.
+        raise ImageValidationError(
+            f"Image dimensions are not supported (maximum {MAX_IMAGE_PIXELS:,} pixels)."
+        ) from error
     except (UnidentifiedImageError, OSError) as error:
         raise ImageValidationError("The upload is not a readable JPEG or PNG image.") from error
     if image_format not in ALLOWED_FORMATS:
@@ -193,8 +203,8 @@ def decode_image(data: bytes) -> Image.Image:
             f"(maximum {MAX_IMAGE_PIXELS:,} pixels)."
         )
     try:
-        return image.convert("RGB")
-    except (OSError, ValueError, Image.DecompressionBombError) as error:
+        return ImageOps.exif_transpose(image).convert("RGB")
+    except (OSError, ValueError, SyntaxError, Image.DecompressionBombError) as error:
         raise ImageValidationError("The image data is corrupt or truncated.") from error
 
 
@@ -335,7 +345,15 @@ def _load_session(name: str):
     options.log_severity_level = 3
     options.intra_op_num_threads = int(os.getenv("VISION_THREADS", "2"))
     options.inter_op_num_threads = 1
-    _session = ort.InferenceSession(str(path), options, providers=["CPUExecutionProvider"])
+    try:
+        session = ort.InferenceSession(str(path), options, providers=["CPUExecutionProvider"])
+    except Exception as error:  # onnxruntime raises its own non-RuntimeError types
+        raise ModelUnavailableError(
+            f"Object detection model file {path} could not be loaded "
+            f"({type(error).__name__}). Re-download it: "
+            f".\\.venv\\Scripts\\python.exe backend\\download_vision_model.py --model {name} --force"
+        ) from error
+    _session = session
     _session_name = name
     return _session
 

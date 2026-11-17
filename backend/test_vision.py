@@ -127,6 +127,38 @@ class DecodeImageTests(unittest.TestCase):
                 vision.decode_image(_png_bytes(8, 6))
 
 
+    def test_decompression_bomb_header_is_a_validation_error(self):
+        # Regression: Pillow raises DecompressionBombError (not OSError) from
+        # Image.open for huge dimensions; it used to escape as an HTTP 500.
+        buffer = io.BytesIO()
+        Image.new("1", (20000, 10000)).save(buffer, format="PNG")  # ~24 KB file
+        with self.assertRaises(vision.ImageValidationError):
+            vision.decode_image(buffer.getvalue())
+
+    def test_multi_picture_jpeg_from_phones_is_accepted(self):
+        # Regression: Pillow reports MPO for many phone JPEGs; they were 415.
+        buffer = io.BytesIO()
+        frames = [Image.new("RGB", (16, 12), (200, 0, 0)), Image.new("RGB", (16, 12))]
+        frames[0].save(buffer, format="MPO", save_all=True, append_images=frames[1:])
+        self.assertEqual(Image.open(io.BytesIO(buffer.getvalue())).format, "MPO")
+        self.assertEqual(vision.decode_image(buffer.getvalue()).size, (16, 12))
+
+    def test_exif_orientation_is_applied(self):
+        # Regression: a sideways-stored phone photo (orientation 6 = rotate 90)
+        # must be decoded upright, or the normalized boxes land in the wrong place.
+        image = Image.new("RGB", (64, 32), (0, 0, 0))
+        image.paste((255, 255, 255), (0, 0, 8, 8))  # white marker at stored top-left
+        exif = image.getexif()
+        exif[0x0112] = 6
+        buffer = io.BytesIO()
+        image.save(buffer, format="PNG", exif=exif)
+        decoded = vision.decode_image(buffer.getvalue())
+        self.assertEqual(decoded.size, (32, 64))
+        # Rotating 90 degrees clockwise moves the stored top-left to the top-right.
+        self.assertGreater(decoded.getpixel((30, 2))[0], 200)
+        self.assertLess(decoded.getpixel((1, 2))[0], 50)
+
+
 class FakeSession:
     def __init__(self, output=None, error=None):
         self.output = output
@@ -177,7 +209,8 @@ class DetectTests(unittest.TestCase):
             vision._session_name = name
             return session
 
-        with mock.patch.object(vision, "_load_session", side_effect=fake_load),                 mock.patch.dict(os.environ, {"VISION_KEEP_LOADED": "off"}):
+        with mock.patch.object(vision, "_load_session", side_effect=fake_load), \
+                mock.patch.dict(os.environ, {"VISION_KEEP_LOADED": "off"}):
             vision.detect(Image.new("RGB", (32, 32)))
             self.assertIsNone(vision._session)
         with mock.patch.dict(os.environ, {"VISION_KEEP_LOADED": ""}):
@@ -200,6 +233,17 @@ class DetectTests(unittest.TestCase):
             with self.assertRaises(vision.ModelUnavailableError) as ctx:
                 vision.detect(Image.new("RGB", (32, 32)))
         self.assertIn("download_vision_model.py", str(ctx.exception))
+
+    def test_corrupt_weights_raise_model_unavailable(self):
+        # Regression: onnxruntime's InvalidProtobuf is not a RuntimeError and
+        # used to escape as an HTTP 500 with a plain-text body.
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {"VISION_MODELS_DIR": tmp}):
+            Path(tmp, "yolox_tiny.onnx").write_bytes(b"not an onnx model")
+            vision.unload_model()
+            with self.assertRaises(vision.ModelUnavailableError) as ctx:
+                vision.detect(Image.new("RGB", (32, 32)))
+            self.assertIsNone(vision._session)
+        self.assertIn("--force", str(ctx.exception))
 
     def test_unknown_model_name(self):
         with mock.patch.dict(os.environ, {"VISION_MODEL": "yolov8n"}):

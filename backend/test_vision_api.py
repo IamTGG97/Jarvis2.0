@@ -153,6 +153,86 @@ class DetectRouteTests(unittest.TestCase):
             )
         self.assertEqual(response.status_code, 200)
 
+    def test_large_frame_is_never_spooled_to_disk(self):
+        # Regression: FastAPI's UploadFile spooled uploads over 1 MB into a
+        # temp file on disk. A ~1.9 MB noisy PNG must stay in memory.
+        import numpy as np
+
+        buffer = io.BytesIO()
+        noise = np.random.default_rng(0).integers(0, 255, (800, 800, 3), dtype=np.uint8)
+        Image.fromarray(noise).save(buffer, format="PNG")
+        data = buffer.getvalue()
+        self.assertGreater(len(data), 1024 * 1024)
+        received = []
+        with mock.patch.object(
+            vision_api.vision, "detect_bytes", side_effect=lambda b: received.append(b) or FAKE_RESULT
+        ), mock.patch("tempfile.TemporaryFile", side_effect=AssertionError("temp file created")), \
+                mock.patch("builtins.open", side_effect=AssertionError("open() called")), \
+                mock.patch("os.open", side_effect=AssertionError("os.open() called")):
+            response = _client().post("/api/detect", files={"file": ("a.png", data, "image/png")})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(received, [data])
+
+    def test_oversized_chunked_body_is_413_without_content_length(self):
+        boundary = "testboundary"
+        crlf = bytes([13, 10])
+        head = b"".join([
+            f"--{boundary}".encode(), crlf,
+            b'Content-Disposition: form-data; name="file"; filename="a.png"', crlf,
+            b"Content-Type: image/png", crlf, crlf,
+        ])
+
+        def body():
+            yield head
+            for _ in range(6):
+                yield b"0" * (1024 * 1024)
+            yield crlf + f"--{boundary}--".encode() + crlf
+
+        with mock.patch.object(vision_api.vision, "detect_bytes") as detect:
+            response = _client().post(
+                "/api/detect",
+                content=body(),
+                headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+            )
+        self.assertEqual(response.status_code, 413)
+        detect.assert_not_called()
+
+    def test_non_multipart_body_is_422(self):
+        response = _client().post("/api/detect", json={"file": "x"})
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.json()["detail"][0]["loc"], ["body", "file"])
+
+    def test_two_files_are_rejected(self):
+        response = _client().post(
+            "/api/detect",
+            files=[("file", ("a.png", _image_bytes(), "image/png")), ("file", ("b.png", _image_bytes(), "image/png"))],
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_decompression_bomb_is_400_not_500(self):
+        buffer = io.BytesIO()
+        Image.new("1", (20000, 10000)).save(buffer, format="PNG")
+        response = _client().post("/api/detect", files={"file": ("b.png", buffer.getvalue(), "image/png")})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("pixels", response.json()["detail"])
+
+    def test_corrupt_weights_are_503_json(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {"VISION_MODELS_DIR": tmp}):
+            Path(tmp, "yolox_tiny.onnx").write_bytes(b"garbage")
+            vision.unload_model()
+            response = _client().post(
+                "/api/detect", files={"file": ("a.png", _image_bytes(), "image/png")}
+            )
+        vision.unload_model()
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("download_vision_model.py", response.json()["detail"])
+
+    def test_openapi_documents_the_file_field(self):
+        from main import app
+
+        schema = app.openapi()["paths"]["/api/detect"]["post"]["requestBody"]["content"]
+        self.assertIn("file", schema["multipart/form-data"]["schema"]["properties"])
+
 
 @unittest.skipUnless(
     vision.model_path(vision.model_name()).is_file(),
