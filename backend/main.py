@@ -20,6 +20,7 @@ from memory import remember_turn, retrieve_memory
 from memory_prompt import build_chat_messages
 from retention import start_retention_task
 from sessions_api import router as sessions_router
+from vision_api import router as vision_router
 
 load_dotenv()
 
@@ -48,6 +49,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="Jarvis2.0 Local API", lifespan=lifespan)
 app.include_router(sessions_router)
+app.include_router(vision_router)
 
 
 class RespondRequest(BaseModel):

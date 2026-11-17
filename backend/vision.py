@@ -68,6 +68,10 @@ class ImageValidationError(ValueError):
     """The upload is not a usable JPEG/PNG image (maps to HTTP 4xx)."""
 
 
+class UnsupportedImageFormatError(ImageValidationError):
+    """A decodable image that is not JPEG or PNG (maps to HTTP 415)."""
+
+
 class ModelUnavailableError(RuntimeError):
     """Model weights are missing or the model name is unknown (maps to 503)."""
 
@@ -176,7 +180,7 @@ def decode_image(data: bytes) -> Image.Image:
     except (UnidentifiedImageError, OSError) as error:
         raise ImageValidationError("The upload is not a readable JPEG or PNG image.") from error
     if image_format not in ALLOWED_FORMATS:
-        raise ImageValidationError("Only JPEG and PNG images are supported.")
+        raise UnsupportedImageFormatError("Only JPEG and PNG images are supported.")
     if width < 1 or height < 1 or width * height > MAX_IMAGE_PIXELS:
         raise ImageValidationError(
             f"Image dimensions {width}x{height} are not supported "
