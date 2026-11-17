@@ -141,6 +141,12 @@ def confidence_threshold() -> float:
     return value
 
 
+def keep_loaded() -> bool:
+    """VISION_KEEP_LOADED=off unloads the model after every request (saves ~70 MB
+    RAM between frames, costs ~0.1-0.6 s to reload)."""
+    return os.getenv("VISION_KEEP_LOADED", "on").strip().lower() not in {"0", "off", "false", "no"}
+
+
 def models_dir() -> Path:
     raw = os.getenv("VISION_MODELS_DIR", "").strip()
     return Path(raw) if raw else MODELS_DIR
@@ -334,12 +340,16 @@ def _load_session(name: str):
     return _session
 
 
+def _drop_session() -> None:
+    global _session, _session_name
+    _session = None
+    _session_name = None
+
+
 def unload_model() -> None:
     """Drop the loaded session (used by tests and to free RAM)."""
-    global _session, _session_name
     with _session_lock:
-        _session = None
-        _session_name = None
+        _drop_session()
 
 
 def detect(image: Image.Image) -> DetectionResult:
@@ -356,8 +366,12 @@ def detect(image: Image.Image) -> DetectionResult:
             input_name = session.get_inputs()[0].name
             output = session.run(None, {input_name: tensor})[0]
         except Exception as error:  # onnxruntime raises its own exception types
+            if not keep_loaded():
+                _drop_session()
             raise DetectionError(f"ONNX inference failed: {type(error).__name__}") from error
         inference_ms = (time.perf_counter() - started) * 1000
+        if not keep_loaded():
+            _drop_session()
     boxes, scores, class_ids = decode_yolox(output, input_size, ratio, threshold)
     detections = postprocess(boxes, scores, class_ids, width, height)
     return DetectionResult(detections, width, height, inference_ms)

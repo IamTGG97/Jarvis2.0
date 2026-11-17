@@ -167,6 +167,22 @@ class DetectTests(unittest.TestCase):
         self.assertAlmostEqual(box["height"], 128 / 416, places=3)
         self.assertEqual(session.inputs[0]["images"].shape, (1, 3, 416, 416))
 
+    def test_keep_loaded_off_unloads_after_each_request(self):
+        session = FakeSession(_yolox_output())
+        loads = []
+
+        def fake_load(name):
+            loads.append(name)
+            vision._session = session
+            vision._session_name = name
+            return session
+
+        with mock.patch.object(vision, "_load_session", side_effect=fake_load),                 mock.patch.dict(os.environ, {"VISION_KEEP_LOADED": "off"}):
+            vision.detect(Image.new("RGB", (32, 32)))
+            self.assertIsNone(vision._session)
+        with mock.patch.dict(os.environ, {"VISION_KEEP_LOADED": ""}):
+            self.assertTrue(vision.keep_loaded())
+
     def test_no_person_when_only_objects(self):
         result = vision.DetectionResult(
             [vision.Detection("cup", 0.9, 0.1, 0.1, 0.2, 0.2)], 10, 10, 5.0
