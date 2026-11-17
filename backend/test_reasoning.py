@@ -70,6 +70,9 @@ class RouterTests(unittest.TestCase):
             "Where is my bottle?",
             "Do you see a dog?",
             "Are there any chairs in the room?",
+            "Can you tell me what's on my desk right now?",
+            "What's behind me?",
+            "What is happening in this picture?",
         ])
 
     def test_vlm_questions(self):
@@ -87,6 +90,15 @@ class RouterTests(unittest.TestCase):
             "What kind of plant is this?",
             "What's the logo on my cup?",
             "What am I wearing?",
+            "How do I look?",
+            "Is the bottle full or empty?",
+        ])
+
+    def test_why_and_memory_questions_stay_text_with_image(self):
+        self.assertRoutes("text", [
+            "Why is the sky blue?",
+            "What did I say the color of my car was?",
+            "Remember that my mug is the blue one.",
         ])
 
     def test_detail_words_win_over_counting(self):

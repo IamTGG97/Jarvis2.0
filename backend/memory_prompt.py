@@ -29,11 +29,18 @@ MEMORY_RULES = (
 
 NO_NOTES = "(no earlier conversation)"
 
+# Wording measured on qwen2.5:1.5b (docs/overnight/vision-reasoning-backend.md):
+# a softer version still produced "Sure, let's check the desk" and "You don't
+# look tired"; this one answered "I can't see anything right now" for those
+# while still answering from notes ("What color is my car?") and general
+# knowledge ("What color is a banana?").
 NO_VISION = (
-    "You have no camera image and no object detections for this turn, so you "
-    "cannot see anything right now. If the user asks what you see or about "
-    "anything visual (colors, objects, text, people in view), say that you "
-    "can't see it right now. Never invent visual details."
+    "IMPORTANT: You have no eyes. No camera image and no object detections were "
+    "given to you for this turn, so you cannot see the user, their room, or "
+    "anything around them. If a question needs sight (what is on, behind, near "
+    "or around the user, how they or something looks, colors, objects, text), "
+    "answer: \"I can't see anything right now.\" Do not pretend to look, and "
+    "never describe or guess what might be there."
 )
 
 

@@ -93,24 +93,31 @@ async def _capped_body(request: Request) -> AsyncIterator[bytes]:
         yield chunk
 
 
-async def _read_image_upload(request: Request) -> tuple[str, bytes]:
-    """Return (content type, bytes) of the ``file`` field, entirely in memory."""
+async def read_form_in_memory(request: Request, missing_detail: object = MISSING_FILE_DETAIL):
+    """Parse a multipart body (at most one file, 5 MB + 64 KB in total) fully
+    in memory. Also used by ``POST /api/respond/vision``. The caller must
+    ``await form.close()``."""
     declared = request.headers.get("content-length", "")
     if declared.isdigit() and int(declared) > MAX_REQUEST_BYTES:
         raise HTTPException(status_code=413, detail=TOO_LARGE_DETAIL)
     media_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
     if media_type != "multipart/form-data":
-        raise HTTPException(status_code=422, detail=MISSING_FILE_DETAIL)
+        raise HTTPException(status_code=422, detail=missing_detail)
 
     parser = _InMemoryMultiPartParser(
         request.headers, _capped_body(request), max_files=1, max_fields=10
     )
     try:
-        form = await parser.parse()
+        return await parser.parse()
     except _RequestTooLarge:
         raise HTTPException(status_code=413, detail=TOO_LARGE_DETAIL) from None
     except MultiPartException as error:
         raise HTTPException(status_code=400, detail=f"Malformed upload: {error.message}") from error
+
+
+async def _read_image_upload(request: Request) -> tuple[str, bytes]:
+    """Return (content type, bytes) of the ``file`` field, entirely in memory."""
+    form = await read_form_in_memory(request)
     try:
         upload = form.get("file")
         if not isinstance(upload, UploadFile):

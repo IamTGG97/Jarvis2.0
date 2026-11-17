@@ -30,7 +30,7 @@ class MemoryPromptTests(unittest.TestCase):
     def test_without_vision_prompt_says_jarvis_cannot_see(self) -> None:
         system = build_chat_messages("What do you see?", [])[0]["content"]
         self.assertIn(NO_VISION, system)
-        self.assertIn("Never invent visual details", system)
+        self.assertIn("I can't see anything right now.", system)
 
     def test_vision_context_replaces_no_vision_line(self) -> None:
         messages = build_chat_messages("Hi", [], "The object detector found: a cup.")

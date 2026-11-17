@@ -136,6 +136,7 @@ VLM_PATTERNS = [
     r"\bwhat (is|'s) (this|that|it)\b", r"\bwhat are (these|those)\b", r"\bwhats (this|that)\b",
     r"\bwhat am i holding\b", r"\bin my hand\b", r"\bholding\b",
     r"\bwearing\b", r"\bmade of\b", r"\bmaterial\b", r"\bshape\b", r"\bpattern\b",
+    r"\b(how|do|does) (do |does )?(i|my [a-z]+) look\b",
     r"\bhow full\b",
     r"\b(is|are) (it|this|that|these|those|the [a-z]+|my [a-z]+) "
     r"(on|off|open|closed|empty|full|clean|dirty|broken|plugged in)\b",
@@ -149,6 +150,8 @@ DETECTION_PATTERNS = {
         r"\bwhat('s| is) (in front of|around|near) (you|me)\b",
         r"\bwhat('s| is) (here|in (the|this) (room|picture|image|frame|view))\b",
         r"\blook around\b", r"\bwhat objects\b", r"\bwhat things\b", r"\bwhat can you spot\b",
+        r"\bwhat('s| is| are) (on|behind|next to|near|around|beside) (me|my|the|this)\b",
+        r"\bwhat('s| is) (happening|going on) (here|in (the|this) (picture|image|frame|room|photo))\b",
     ],
     "locate": [r"\bwhere('s| is| are)\b"],
     "presence": [
